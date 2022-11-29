@@ -56,7 +56,7 @@
 * | [<---] YT_FILE_STRING                 TYPE        STRING_TABLE
 * +-------------------------------------------------------------------------------------------------+    
 FORM upload_local_excel using     XV_FILENAME	   TYPE STRING
-                                  XV_HEADER	      TYPE FLAG
+                                  XV_HEADER      TYPE FLAG
                         changing  YT_FILE_STRING TYPE STRING_TABLE.
 
     DATA: lv_filename TYPE rlgrap-filename,
