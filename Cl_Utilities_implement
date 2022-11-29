@@ -1,6 +1,12 @@
+* +-------------------------------------------------------------------------------------------------+
+* | Static Public Method ZMS_CL_UTILITIES=>GET_HEADER_FROM_DDIC
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] XV_TAB_NAME                    TYPE        STRING
+* | [<---] YV_HEADER                      TYPE        STRING
+* +-------------------------------------------------------------------------------------------------+
   FORM get_header_from_ddic using    XV_TAB_NAME TYPE STRING
-                            changing YV_HEADER   TYPE STRING
-.
+                            changing YV_HEADER   TYPE STRING.
+                            
     DATA: lv_details       TYPE abap_compdescr_tab,
           lv_ref_table_des TYPE REF TO cl_abap_structdescr,
           lt_type          TYPE TABLE OF dfies.
@@ -42,8 +48,13 @@
     ENDLOOP.
   ENDFORM.
   
-  
-  
+* +-------------------------------------------------------------------------------------------------+
+* | Static Public Method ZMS_CL_UTILITIES=>UPLOAD_LOCAL_EXCEL
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] XV_FILENAME                    TYPE        STRING
+* | [--->] XV_HEADER                      TYPE        FLAG
+* | [<---] YT_FILE_STRING                 TYPE        STRING_TABLE
+* +-------------------------------------------------------------------------------------------------+    
 FORM upload_local_excel using     XV_FILENAME	   TYPE STRING
                                   XV_HEADER	     TYPE FLAG
                         changing  YT_FILE_STRING TYPE STRING_TABLE.
@@ -135,8 +146,12 @@ FORM upload_local_excel using     XV_FILENAME	   TYPE STRING
     ENDLOOP.
   ENDFORM.
   
-  
-  
+* +-------------------------------------------------------------------------------------------------+
+* | Static Public Method ZMS_CL_UTILITIES=>UPLOAD_LOCAL_CSV
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] XV_FILENAME                    TYPE        STRING
+* | [<---] YT_FILE_STRING                 TYPE        STRING_TABLE
+* +-------------------------------------------------------------------------------------------------+  
   FORM upload_local_csv using    XV_FILENAME	  TYPE STRING
                         changing YT_FILE_STRING	TYPE STRING_TABLE.
 
@@ -171,12 +186,16 @@ FORM upload_local_excel using     XV_FILENAME	   TYPE STRING
 
   ENDFORM.
   
-  
-  
-  
+* +-------------------------------------------------------------------------------------------------+
+* | Static Public Method ZMS_CL_UTILITIES=>HELP_F4_INPUT_DIR
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] X_OPTION                       TYPE        CHAR1
+* | [--->] XV_TITLE                       TYPE        STRING(optional)
+* | [<---] YV_DIR                         TYPE        STRING
+* +-------------------------------------------------------------------------------------------------+ 
  FORM help_f4_input_dir using X_OPTION	TYPE CHAR1
                               XV_TITLE	TYPE STRING OPTIONAL
-                              XV_DIR	  TYPE STRING.
+                              YV_DIR	  TYPE STRING.
 
     "Ricordati lo user command nei radio button
     CASE x_option.
@@ -186,19 +205,19 @@ FORM upload_local_excel using     XV_FILENAME	   TYPE STRING
         CALL METHOD cl_gui_frontend_services=>directory_browse
           EXPORTING
             window_title    = xv_title
-            initial_folder  = xv_dir
+            initial_folder  = yv_dir
           CHANGING
-            selected_folder = xv_dir.
+            selected_folder = yv_dir.
 
       WHEN 'S'.
 
         "Selezionre cartella da server
         CALL FUNCTION '/SAPDMC/LSM_F4_SERVER_FILE'
           EXPORTING
-            directory        = xv_dir
+            directory        = yv_dir
             filemask         = '?'
           IMPORTING
-            serverfile       = xv_dir
+            serverfile       = yv_dir
           EXCEPTIONS
             canceled_by_user = 1
             OTHERS           = 2.
