@@ -14,5 +14,5 @@ UPLOAD_LOCAL_EXCEL   using    XV_FILENAME    type STRING
 "Fornisce help per selezionare directory locale o server
 HELP_F4_INPUT_DIR    using    X_OPTION type CHAR1
                               XV_TITLE type STRING optional
-                     changing XV_DIR   type STRING .
+                              XV_DIR   type STRING .
       
