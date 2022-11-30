@@ -229,3 +229,19 @@ FORM upload_local_excel using     XV_FILENAME    TYPE STRING
     ENDCASE.
 
   ENDFORM. 
+
+* +-------------------------------------------------------------------------------------------------+
+* | Static Public Method ZMS_CL_UTILITIES=>GET_LOCAL_DESKTOP_DIR
+* +-------------------------------------------------------------------------------------------------+
+* | [<---] XV_DIR                         TYPE        STRING
+* +-------------------------------------------------------------------------------------------------+
+    CALL METHOD cl_gui_frontend_services=>get_desktop_directory
+      CHANGING
+        desktop_directory = xv_dir
+      EXCEPTIONS
+        cntl_error        = 1.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+    CALL METHOD cl_gui_cfw=>update_view.
