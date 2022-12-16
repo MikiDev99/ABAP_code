@@ -235,6 +235,7 @@ FORM upload_local_excel using     XV_FILENAME    TYPE STRING
 * +-------------------------------------------------------------------------------------------------+
 * | [<---] XV_DIR                         TYPE        STRING
 * +-------------------------------------------------------------------------------------------------+
+FORM get_local_desktop_dir CHANGING xv_dir.
     CALL METHOD cl_gui_frontend_services=>get_desktop_directory
       CHANGING
         desktop_directory = xv_dir
@@ -244,4 +245,5 @@ FORM upload_local_excel using     XV_FILENAME    TYPE STRING
       MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
                  WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
     ENDIF.
+ENDFORM.
     CALL METHOD cl_gui_cfw=>update_view.
