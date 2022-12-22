@@ -508,3 +508,105 @@ ENDFORM.
 
   ENDFORM.
 
+* --------------------------------------------------------------------------------------------------+
+* | Static Public Method ZMS_CL_UTILITIES=>UPLOAD_LOCAL
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] XV_FILENAME              TYPE        STRING
+* | [--->] X_HEADER                 TYPE        FLAG
+* | [--->] XV_TAB_NAME              TYPE        STRING
+* | [--->] YT_SAP_TABLE             TYPE        STABDARD TABLE
+* +-------------------------------------------------------------------------------------------------+
+  FORM upload_local.
+
+    CONSTANTS: lc_data_base TYPE string VALUE '00000000'.
+
+    DATA: lv_filename TYPE string,
+          lv_stringa  TYPE string,
+          lv_stringa2 TYPE string,
+          lv_dato     TYPE string.
+
+    DATA: lv_sap_ref TYPE REF TO data.
+
+    DATA: lv_field_list    TYPE abap_compdescr_tab,
+          lo_ref_table_des TYPE REF TO cl_abap_structdescr.
+
+    DATA: lt_string TYPE TABLE OF string.
+
+    FIELD-SYMBOLS: <sap_tb> TYPE any,
+                   <field>  LIKE LINE OF lv_field_list,
+                   <string> TYPE string,
+                   <out>    TYPE any.
+
+    REFRESH lt_string.
+    IF xv_filename CP '*.xls'
+      OR xv_filename CP '*.xlsx'.
+
+      CALL METHOD zms_cl_utilities=>upload_local_excel
+        EXPORTING
+          xv_filename    = xv_filename     " Percorso file
+          xv_header      = x_header        " Presenza dell'intestazione
+        IMPORTING
+          yt_file_string = lt_string.      " Tabella stringhe
+
+    ELSEIF xv_filename CP '*.csv'.
+      CALL METHOD zms_cl_utilities=>upload_local_csv
+        EXPORTING
+          xv_filename    = xv_filename     " Path file di input
+        IMPORTING
+          yt_file_string = lt_string.     " Tabella stringhe
+
+    ENDIF.
+
+
+    lo_ref_table_des ?=
+          cl_abap_typedescr=>describe_by_name( xv_tab_name ).
+    lv_field_list[] = lo_ref_table_des->components[].
+    CHECK lv_field_list IS NOT INITIAL.
+
+    CREATE DATA lv_sap_ref TYPE REF TO (xv_tab_name).
+    ASSIGN lv_sap_ref->* TO <sap_tb>.
+
+    LOOP AT lt_string ASSIGNING <string>.
+
+      APPEND INITIAL LINE TO yt_sap_table ASSIGNING <sap_tb>.
+
+      CLEAR lv_stringa.
+      CLEAR lv_stringa2.
+      LOOP AT lv_field_list ASSIGNING <field>.
+
+        ASSIGN COMPONENT <field>-name OF STRUCTURE <sap_tb> TO <out>.
+        CHECK sy-subrc EQ 0.
+
+        CLEAR lv_dato.
+
+        IF lv_stringa IS INITIAL.
+          lv_stringa = <string>.
+        ELSE.
+          lv_stringa = lv_stringa2.
+        ENDIF.
+
+        SPLIT lv_stringa AT ';' INTO lv_dato lv_stringa2.
+
+        CASE <field>-type_kind.
+          WHEN cl_abap_typedescr=>typekind_float.
+
+          WHEN cl_abap_typedescr=>typekind_date.
+
+*            IF <field>-name EQ 'NOME_CAMPO_DATA'
+*              OR <field>-name EQ 'NOME_CAMPO_DATA'.
+*              IF strlen( lv_dato ) EQ 10.
+*                <out> = lv_dato+6(4) && lv_dato+3(2) && lv_dato(2).
+*              ELSE.
+*                <out> = lc_data_base.
+*              ENDIF.
+*            ENDIF.
+
+          WHEN OTHERS.
+            <out> = lv_dato.
+        ENDCASE.
+
+      ENDLOOP.
+
+    ENDLOOP.
+
+  ENDFORM.
