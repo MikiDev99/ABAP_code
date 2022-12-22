@@ -514,7 +514,7 @@ ENDFORM.
 * | [--->] XV_FILENAME              TYPE        STRING
 * | [--->] X_HEADER                 TYPE        FLAG
 * | [--->] XV_TAB_NAME              TYPE        STRING
-* | [--->] YT_SAP_TABLE             TYPE        STABDARD TABLE
+* | [<---] YT_SAP_TABLE             TYPE        STABDARD TABLE
 * +-------------------------------------------------------------------------------------------------+
   FORM upload_local.
 
