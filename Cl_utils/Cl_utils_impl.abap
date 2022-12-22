@@ -6,35 +6,35 @@ PERFORM GET_HEADER_FROM_DDIC    using    XV_TAB_NAME type STRING
 "Restituisce una tabella di stringhe separate da ;                     
 PERFORM UPLOAD_LOCAL_EXCEL      using    XV_FILENAME    type STRING
                                          XV_HEADER      type FLAG
-                                changing YT_FILE_STRING type STRING_TABLE .
+                                changing YT_FILE_STRING type STRING_TABLE.
  
 "Restituisce una tabella di stringhe
-PERFORM UPLOAD_LOCAL_CSV       using    XV_FILENAME    type STRING
-                               changing YT_FILE_STRING type STRING_TABLE .
+PERFORM UPLOAD_LOCAL_CSV        using    XV_FILENAME    type STRING
+                                changing YT_FILE_STRING type STRING_TABLE.
 
 "Fornisce help per selezionare directory locale o server
-PERFORM HELP_F4_INPUT_DIR      using    X_OPTION type CHAR1
-                                        XV_TITLE type STRING optional
-                                        XV_DIR   type STRING .
+PERFORM HELP_F4_INPUT_DIR       using X_OPTION type CHAR1
+                                      XV_TITLE type STRING optional
+                                      XV_DIR   type STRING.
                                  
 "Restituisce la directory locale del desktop
-PERFORM GET_LOCAL_DESKTOP_DIR  changing XV_DIR   type STRING .
+PERFORM GET_LOCAL_DESKTOP_DIR   changing XV_DIR type STRING .
 
 "Mostra generico ALV con SALV_TABLE
-PERFORM DISPLAY_GENERIC_ALV    using    XV_TITLE type LVC_TITLE
-                                        X_POPUP  type CHAR1
-                               changing XT_TABLE type STANDARD TABLE.
+PERFORM DISPLAY_GENERIC_ALV     using    XV_TITLE type LVC_TITLE
+                                         X_POPUP  type CHAR1
+                                changing XT_TABLE type STANDARD TABLE.
 
 "Restitusce un record trasposto
-PERFORM GET_TRANSPOSED_TABLE   changing YO_DATA_TRANSP type DATA
-                                        YT_FCAT_TRANSP type LVC_T_FCAT
-                                        XT_TABLE       type STANDARD TABLE
+PERFORM GET_TRANSPOSED_TABLE    changing YO_DATA_TRANSP type DATA
+                                         YT_FCAT_TRANSP type LVC_T_FCAT
+                                         XT_TABLE       type STANDARD TABLE.
 
 "Gestisce .xls .xlsx .csv per SAP
-PERFORM UPLOAD_LOCAL           using    XV_FILENAME  type STRING
-                                        X_HEADER     type FLAG
-                                        XV_TAB_NAME  type STRING
-                               changing YT_SAP_TABLE type STANDARD TABLE.
+PERFORM UPLOAD_LOCAL            using    XV_FILENAME  type STRING
+                                         X_HEADER     type FLAG
+                                         XV_TAB_NAME  type STRING
+                                changing YT_SAP_TABLE type STANDARD TABLE.
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
