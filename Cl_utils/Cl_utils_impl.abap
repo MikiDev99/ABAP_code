@@ -295,7 +295,9 @@ ENDFORM.
 * | [--->] X_POPUP                        TYPE        CHAR1
 * | [<---] XT_TABLE                       TYPE        STANDARD TABLE
 * +-------------------------------------------------------------------------------------------------+
-  FORM display_generic_alv.
+  FORM display_generic_alv USING    XV_TITLE type LVC_TITLE
+                                    X_POPUP  type CHAR1
+                           CHANGING XT_TABLE type STANDARD TABLE..
 
     DATA: lv_lines TYPE i,
           lv_title TYPE lvc_title.
@@ -428,7 +430,9 @@ ENDFORM.
 * | [<---] YT_FCAT_TRANSP                 TYPE        LVC_T_FCAT
 * | [<-->] XT_TABLE                       TYPE        STANDARD TABLE
 * +-------------------------------------------------------------------------------------------------+
-  METHOD get_transposed_table.
+  METHOD get_transposed_table CHANGING YO_DATA_TRANSP type DATA
+                                       YT_FCAT_TRANSP type LVC_T_FCAT
+                                       XT_TABLE       type STANDARD TABLE..
 
 **********************************************************************
 *     ESEMPIO DI LANCIO
@@ -556,7 +560,10 @@ ENDFORM.
 * | [--->] XV_TAB_NAME              TYPE        STRING
 * | [<---] YT_SAP_TABLE             TYPE        STABDARD TABLE
 * +-------------------------------------------------------------------------------------------------+
-  FORM upload_local.
+  FORM upload_local USING    XV_FILENAME  type STRING
+                             X_HEADER     type FLAG
+                             XV_TAB_NAME  type STRING
+                    CHANGING YT_SAP_TABLE type STANDARD TABLE..
 
     CONSTANTS: lc_data_base TYPE string VALUE '00000000'.
 
