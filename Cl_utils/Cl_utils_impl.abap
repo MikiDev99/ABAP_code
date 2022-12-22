@@ -247,3 +247,264 @@ FORM get_local_desktop_dir CHANGING xv_dir.
     ENDIF.
     CALL METHOD cl_gui_cfw=>update_view.
 ENDFORM.
+
+* --------------------------------------------------------------------------------------------------+
+* | Static Public Method ZMS_CL_UTILITIES=>DISPLAY_GENERIC_ALV
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] XV_TITLE                       TYPE        LVC_TITLE
+* | [--->] X_POPUP                        TYPE        CHAR1
+* | [<---] XT_TABLE                       TYPE        STANDARD TABLE
+* +-------------------------------------------------------------------------------------------------+
+  FORM display_generic_alv.
+
+    DATA: lv_lines TYPE i,
+          lv_title TYPE lvc_title.
+
+    DATA: lo_alv            TYPE REF TO cl_salv_table,
+          lr_salv_columns   TYPE REF TO cl_salv_columns_table,
+          lr_salv_functions TYPE REF TO cl_salv_functions_list,
+          lr_salv_dsp_set   TYPE REF TO cl_salv_display_settings,
+          lr_salv_events    TYPE REF TO cl_salv_events_table,
+          lr_selections     TYPE REF TO cl_salv_selections.
+
+    CLEAR: lv_lines, lv_title.
+    TRY.
+        cl_salv_table=>factory(
+          IMPORTING
+            r_salv_table   =  lo_alv                    " Basis Class Simple ALV Tables
+          CHANGING
+            t_table        =  xt_table[]
+        ).
+      CATCH cx_salv_msg.
+    ENDTRY.
+
+    "Set custom menu functions & buttons
+    "-------------------------------------------------
+    "lo_alv->set_screen_status(
+    "   pfstatus      =  'SALV_STANDARD'
+    "   report        =  'SALV_DEMO_TABLE_FUNCTIONS'
+    "   set_functions = lo_alv->c_functions_all ).
+
+    "Set functions
+    "-------------------------------------------------
+    lr_salv_functions = lo_alv->get_functions( ).
+    lr_salv_functions->set_all( 'X' ). "Lista toolbar standard
+
+    "Set output control
+    "-------------------------------------------------
+    lr_salv_dsp_set = lo_alv->get_display_settings( ).
+    lr_salv_dsp_set->set_striped_pattern( 'X' ).  "Layout zebra
+
+    lv_lines = lines( xt_table[] ).
+    lv_title = xv_title && ' (' && lv_lines && ' Record )'.
+    lr_salv_dsp_set->set_list_header( lv_title ). "Titolo ALV
+
+    "Set column settings
+    "-------------------------------------------------
+    lr_salv_columns = lo_alv->get_columns( ).
+    lr_salv_columns->set_optimize( 'X' ). "Stringe le colonne
+
+    TRY.
+        lr_salv_columns->get_column( 'MANDT' )->set_visible( if_salv_c_bool_sap=>false  ). "Nascondere campi
+        lr_salv_columns->get_column( 'NOME_CAMPO' )->set_long_text( 'NEW_NAME' ). "Cambio label
+      CATCH cx_salv_not_found.
+    ENDTRY.
+
+*    "Implementazione classe per eventi
+*    "-------------------------------------------------
+*    "----------------------------------------------------------------------*
+*    "     CLASS lcl_salv_events DEFINITION                                 *
+*    "----------------------------------------------------------------------*
+*  CLASS lcl_salv_events DEFINITION.
+*    PUBLIC SECTION.
+*
+*      METHODS:
+*        link_click   FOR EVENT link_click   OF cl_salv_events_table
+*          IMPORTING row column.
+*      METHODS:
+*        double_click FOR EVENT double_click OF cl_salv_events_table
+*          IMPORTING row column.
+*
+*  ENDCLASS.                    "lcl_events DEFINITION
+*  "----------------------------------------------------------------------*
+*  "       CLASS lcl_salv_events IMPLEMENTATION
+*  "----------------------------------------------------------------------*
+*  "  SAL Event Handler Methods                                           *
+*  "----------------------------------------------------------------------*
+*  CLASS lcl_salv_events IMPLEMENTATION.
+*
+*    METHOD link_click.
+*
+*      FIELD-SYMBOLS: <alv> LIKE LINE OF gt_alv.
+*
+*      READ TABLE gt_alv ASSIGNING <alv> INDEX row.
+*      CHECK sy-subrc EQ 0.
+*
+*      CASE column.
+*        WHEN 'ANLAGE'.
+*          SET PARAMETER ID 'ANL' FIELD <alv_0100>-anlage.
+*          CALL TRANSACTION 'ES32' AND SKIP FIRST SCREEN.
+*
+*        WHEN OTHERS.
+*      ENDCASE.
+*
+*    ENDMETHOD.                    "link_click
+*
+*  ENDCLASS.                    "lcl_events IMPLEMENTATION
+*  DATA: gr_salv_event_handler TYPE REF TO lcl_salv_events.
+
+    "lr_salv_events = lo_alv->get_event( ).
+    "CREATE OBJECT gr_salv_event_handler.
+    "SET HANDLER gr_salv_event_handler->link_click  FOR lr_salv_events.
+    "SET HANDLER gr_salv_event_handler->double_click FOR lr_salv_events.
+
+    "Seleziona più righe
+    "-------------------------------------------------
+    lr_selections = lo_alv->get_selections( ).
+    lr_selections->set_selection_mode( if_salv_c_selection_mode=>row_column ).
+
+    "Set alv in pop_up mode
+    "-------------------------------------------------
+    IF x_popup EQ 'X'.
+
+      lo_alv->set_screen_popup(
+              start_column = 1
+              end_column   = 100
+              start_line   = 1
+              end_line     = 15 ).
+
+    ENDIF.
+
+    "Output the table
+    "-------------------------------------------------
+    lo_alv->display( ).
+
+  ENDFORM.
+  
+* --------------------------------------------------------------------------------------------------+
+* | Static Public Method ZMS_CL_UTILITIES=>GET_TRANSPOSED_TABLE
+* +-------------------------------------------------------------------------------------------------+
+* | [<---] YO_DATA_TRANSP                 TYPE        DATA
+* | [<---] YT_FCAT_TRANSP                 TYPE        LVC_T_FCAT
+* | [<-->] XT_TABLE                       TYPE        STANDARD TABLE
+* +-------------------------------------------------------------------------------------------------+
+  METHOD get_transposed_table.
+
+**********************************************************************
+*     ESEMPIO DI LANCIO
+*
+*    SELECT * UP TO 1 ROWS
+*     FROM sflight INTO TABLE @DATA(lt_my_table).
+*
+*    DATA: lo_data_transp TYPE REF TO data.
+*
+*    zag_cl_utils=>get_transposed_table(
+*      IMPORTING
+*        yo_data_transp = lo_data_transp
+*      CHANGING
+*        xt_table       = lt_my_table
+*    ).
+*
+*    ASSIGN lo_data_transp->* TO FIELD-SYMBOL(<transposed>).
+*
+*
+*    zag_cl_utils=>display_generic_alv(
+*      EXPORTING
+*        x_popup   = abap_true
+*      CHANGING
+*        xt_table  = <transposed>
+*    ).
+**********************************************************************
+
+    DATA: lt_fcat   TYPE lvc_t_fcat,
+          lo_transp TYPE REF TO data.
+
+    FIELD-SYMBOLS: <fcat>           TYPE lvc_s_fcat,
+                   <lt_transp_data> TYPE table,
+                   <yt_data_transp> TYPE table.
+
+    "-------------------------------------------------
+
+    CLEAR: yo_data_transp, yt_fcat_transp[].
+
+    CHECK lines( xt_table ) EQ 1.
+
+    "------------------------------------------------
+    "-> Creazione tabella 'DESCR_CAMPO' + 'VALORE'
+    "-> con relativo riferimento <fs>
+
+    APPEND INITIAL LINE TO lt_fcat ASSIGNING <fcat>.
+    <fcat>-fieldname  = 'COLUMNTEXT'.
+    <fcat>-ref_table  = 'LVC_S_DETA'.
+
+    APPEND INITIAL LINE TO lt_fcat ASSIGNING <fcat>.
+    <fcat>-fieldname  = 'VALUE'.
+    <fcat>-ref_field  = 'VALUE'.
+    <fcat>-ref_table  = 'LVC_S_DETA'.
+
+    CALL METHOD cl_alv_table_create=>create_dynamic_table
+      EXPORTING
+        it_fieldcatalog = lt_fcat
+      IMPORTING
+        ep_table        = lo_transp.
+
+    ASSIGN lo_transp->* TO <lt_transp_data>.
+
+
+    "------------------------------------------------
+    "-> Estrazione lista campi tabella originale
+
+    DATA: lo_alv        TYPE REF TO cl_salv_table,
+          lr_columns    TYPE REF TO cl_salv_columns_table,
+          lt_column_ref TYPE salv_t_column_ref.
+
+    TRY.
+        cl_salv_table=>factory(
+          IMPORTING
+            r_salv_table = lo_alv
+          CHANGING
+            t_table      = xt_table[] ).
+
+      CATCH cx_salv_msg.
+    ENDTRY.
+
+    lr_columns    = lo_alv->get_columns( ).
+    lt_column_ref = lr_columns->get( ).
+
+
+    "------------------------------------------------
+    "-> Trasposizione campi da NxM a MxN
+
+    READ TABLE xt_table ASSIGNING FIELD-SYMBOL(<original_row>) INDEX 1.
+
+    LOOP AT lt_column_ref ASSIGNING FIELD-SYMBOL(<column_ref>).
+
+      CHECK <column_ref>-columnname NE 'MANDT'.
+
+      ASSIGN COMPONENT <column_ref>-columnname OF STRUCTURE <original_row> TO FIELD-SYMBOL(<original_value>).
+      CHECK sy-subrc EQ 0.
+
+      APPEND INITIAL LINE TO <lt_transp_data> ASSIGNING FIELD-SYMBOL(<transp_row>).
+
+      ASSIGN COMPONENT 'COLUMNTEXT' OF STRUCTURE <transp_row> TO FIELD-SYMBOL(<transp_coltxt>).
+      ASSIGN COMPONENT 'VALUE'      OF STRUCTURE <transp_row> TO FIELD-SYMBOL(<transp_value>).
+
+      <transp_coltxt> = <column_ref>-r_column->get_long_text( ).
+      <transp_value>  = <original_value>.
+
+    ENDLOOP.
+
+    "------------------------------------------------
+    "-> Esportazione tabella esportata
+
+    CALL METHOD cl_alv_table_create=>create_dynamic_table
+      EXPORTING
+        it_fieldcatalog = lt_fcat
+      IMPORTING
+        ep_table        = yo_data_transp.
+
+    ASSIGN yo_data_transp->* TO <yt_data_transp>.
+    <yt_data_transp> = <lt_transp_data>.
+
+  ENDFORM.
+
