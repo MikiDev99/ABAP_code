@@ -192,7 +192,7 @@ FORM upload_local_excel using     XV_FILENAME    TYPE STRING
           <file> = <file> && ';' && '$'.
         ENDIF.
         
-        REPLACE ALL OCCURENCY OF '$' IN <file> WITH ' '.
+        REPLACE ALL OCCURRENCES OF '$' IN <file> WITH ' '.
       ENDDO.
 
     ENDLOOP.
