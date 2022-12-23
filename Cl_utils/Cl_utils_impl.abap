@@ -599,20 +599,15 @@ ENDFORM.
     REFRESH lt_string.
     IF xv_filename CP '*.xls'
       OR xv_filename CP '*.xlsx'.
-
-      CALL METHOD zms_cl_utilities=>upload_local_excel
-        EXPORTING
-          xv_filename    = xv_filename     " Percorso file
-          xv_header      = x_header        " Presenza dell'intestazione
-        IMPORTING
-          yt_file_string = lt_string.      " Tabella stringhe
-
+      
+        PERFORM upload_local_excel USING    xv_filename     " Percorso file
+                                            x_header        " Presenza dell'intestazione
+                                   CHANGING lt_string.      " Tabella stringhe
+        
     ELSEIF xv_filename CP '*.csv'.
-      CALL METHOD zms_cl_utilities=>upload_local_csv
-        EXPORTING
-          xv_filename    = xv_filename     " Path file di input
-        IMPORTING
-          yt_file_string = lt_string.     " Tabella stringhe
+    
+      PERFORM upload_local_csv USING    xv_filename " Path file di input
+                               CHANGING lt_string.  " Tabella stringhe
 
     ENDIF.
 
