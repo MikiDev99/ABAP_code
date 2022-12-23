@@ -179,7 +179,7 @@ FORM upload_local_excel using     XV_FILENAME    TYPE STRING
       
         READ TABLE lt_intern ASSIGNING <intern> BINARY SEARCH
           WITH KEY row = <index>-row
-                 col = lv_col.
+                   col = lv_col.
         IF sy-subrc EQ 0.
 
           IF <file> IS INITIAL.
