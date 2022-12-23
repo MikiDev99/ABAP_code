@@ -100,10 +100,14 @@ FORM upload_local_excel using     XV_FILENAME    TYPE STRING
                         changing  YT_FILE_STRING TYPE STRING_TABLE.
 
     DATA: lv_filename TYPE rlgrap-filename,
-          lv_sytabix  TYPE sy-tabix,
+          lv_col      TYPE sy-index,
           lv_end_row  TYPE i,
-          lv_end_col  TYPE i.
-
+          lv_end_col  TYPE i,
+          lv_nfields  TYPE i.
+    
+    DATA: lv_details       TYPE abap_compdescr_tab,
+          lv_ref_table_des TYPE REF TO cl_abap_structdescr,
+    
     DATA: lt_intern       TYPE TABLE OF alsmex_tabline,
           lt_intern_index TYPE TABLE OF alsmex_tabline.
 
@@ -156,7 +160,12 @@ FORM upload_local_excel using     XV_FILENAME    TYPE STRING
       MESSAGE s646(db) WITH TEXT-e04 DISPLAY LIKE 'W'.
 *      STOP.
     ENDIF.
-
+    
+    lv_ref_table_des ?=
+        cl_abap_typedescr=>describe_by_name( xv_tab_name ).
+    lv_details[] = lv_ref_table_des->components[].
+    lv_nfields = lines( lv_details ).
+    
     SORT lt_intern BY row col.
     lt_intern_index[] = lt_intern[].
     DELETE ADJACENT DUPLICATES FROM lt_intern_index COMPARING row.
@@ -164,24 +173,27 @@ FORM upload_local_excel using     XV_FILENAME    TYPE STRING
     REFRESH yt_file_string.
     LOOP AT lt_intern_index ASSIGNING <index>.
 
-      READ TABLE lt_intern TRANSPORTING NO FIELDS BINARY SEARCH
-        WITH KEY row = <index>-row.
-      CHECK sy-subrc EQ 0.
-      lv_sytabix = sy-tabix.
-
       APPEND INITIAL LINE TO yt_file_string ASSIGNING <file>.
-      LOOP AT lt_intern ASSIGNING <intern> FROM lv_sytabix.
-        IF <intern>-row NE <index>-row.
-          EXIT.
-        ENDIF.
+      DO lv_nfield TIMES.
+        lv_col = sy-index.
+      
+        READ TABLE lt_intern ASSIGNING <intern> BINARY SEARCH
+          WITH KEY row = <index>-row
+                 col = lv_col.
+        IF sy-subrc EQ 0.
 
-        IF <file> IS INITIAL.
-          <file> = <intern>-value.
+          IF <file> IS INITIAL.
+            <file> = <intern>-value.
+          ELSE.
+            <file> = <file> && ';' && <intern>-value.
+          ENDIF.
+        
         ELSE.
-          <file> = <file> && ';' && <intern>-value.
+          <file> = <file> && ';' && '$'.
         ENDIF.
-
-      ENDLOOP.
+        
+        REPLACE ALL OCCURENCY OF '$' IN <file> WITH ' '.
+      ENDDO.
 
     ENDLOOP.
   ENDFORM.
