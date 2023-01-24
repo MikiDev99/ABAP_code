@@ -35,6 +35,15 @@ PERFORM UPLOAD_LOCAL            using    XV_FILENAME  type STRING
                                          X_HEADER     type FLAG
                                          XV_TAB_NAME  type STRING
                                 changing YT_SAP_TABLE type STANDARD TABLE.
+                                
+"Restituisce un testo standard modificato con input
+PERFORM GET_STDTXT              using    XV_STDTXT_NAME type THEAD-TDNAME
+                                         XV_LANGUAGE    type TDSPRAS
+                                         XT_CONVERTER   type TT_CONVERTER
+                                changing YT_STDTXT_OUT  type TT_TLINE
+
+"Restituisce la stringa rimuovendo i caretteri speciali
+PERFORM REMOVE_SPECIAL_CHAR     changing YV_STRING_TO_CHANGE type STRING 
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -662,5 +671,78 @@ ENDFORM.
       ENDLOOP.
 
     ENDLOOP.
+
+  ENDFORM.
+  
+* --------------------------------------------------------------------------------------------------+
+* | Static Public Method ZMS_CL_UTILITIES=>GET_STDTXT
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] XV_STDTXT_NAME           TYPE        THEAD-TDNAME
+* | [--->] XV_LANGUAGE              TYPE        TDSPRAS
+* | [--->] XT_CONVERTER             TYPE        TT_CONVERTER
+* | [<---] YT_STDTXT_OUT            TYPE        TT_TLINE
+* +-------------------------------------------------------------------------------------------------+
+  FORM get_stdtxt USING    XV_STDTXT_NAME type THEAD-TDNAME
+                           XV_LANGUAGE    type TDSPRAS
+                           XT_CONVERTER   type TT_CONVERTER
+                  CHANGING YT_STDTXT_OUT  type TT_TLINE.
+                  
+    TYPES:
+       BEGIN OF ty_converter,
+          field TYPE string,
+          value TYPE string,
+        END OF ty_converter .
+
+    TYPES:
+      tt_tline TYPE TABLE OF tline .
+    TYPES:
+      tt_converter TYPE TABLE OF ty_converter .
+      
+    FIELD-SYMBOLS: <conv> LIKE LINE OF xt_converter,
+                   <out>  LIKE LINE OF yt_stdtxt_out.
+
+    REFRESH yt_stdtxt_out[].
+
+    CALL FUNCTION 'READ_TEXT'
+      EXPORTING
+*       CLIENT                  = SY-MANDT
+        id                      = 'ST'
+        language                = xv_language
+        name                    = xv_stdtxt_name
+        object                  = 'TEXT'
+      TABLES
+        lines                   = yt_stdtxt_out[]
+      EXCEPTIONS
+        id                      = 1
+        language                = 2
+        name                    = 3
+        not_found               = 4
+        object                  = 5
+        reference_check         = 6
+        wrong_access_to_archive = 7
+        OTHERS                  = 8.
+    IF sy-subrc <> 0.
+* Implement suitable error handling here
+    ENDIF.
+
+    LOOP AT yt_stdtxt_out ASSIGNING <out>.
+
+      LOOP AT xt_converter ASSIGNING <conv>.
+        REPLACE ALL OCCURRENCES OF <conv>-field IN <out>-tdline WITH <conv>-value.
+      ENDLOOP.
+
+    ENDLOOP.
+
+  ENDFORM.
+
+* --------------------------------------------------------------------------------------------------+
+* | Static Public Method ZMS_CL_UTILITIES=>REMOVE_SPECIAL_CHAR
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] YV_STRING_TO_CHANGE      TYPE        STRING
+* +-------------------------------------------------------------------------------------------------+
+  FORM remove_special_char CHANGING YV_STRING_TO_CHANGE type STRING.
+
+    "Toglie tutti i caratteri speciali (tranne che io non specifichi \carattere) e lascia le lettere
+    REPLACE ALL OCCURRENCES OF REGEX '[^[:alpha:]\s\-\@]' IN yv_string_to_change WITH ''.
 
   ENDFORM.
