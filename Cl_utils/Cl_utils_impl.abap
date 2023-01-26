@@ -43,7 +43,11 @@ PERFORM GET_STDTXT              using    XV_STDTXT_NAME type THEAD-TDNAME
                                 changing YT_STDTXT_OUT  type TT_TLINE
 
 "Restituisce la stringa rimuovendo i caretteri speciali
-PERFORM REMOVE_SPECIAL_CHAR     changing YV_STRING_TO_CHANGE type STRING 
+PERFORM REMOVE_SPECIAL_CHAR     using    XV_CHAR_NOT_REMOVE  type STRING   "Caratteri che von vuoi rimuovere
+                                using    X_SPACE             type FLAG     "Mantieni spazio
+                                using    X_ALPHA             type FLAG     "Mantieni lettere alfabetiche
+                                using    X_NUM               type FLAG     "Mantieni numeri
+                                changing YV_STRING_TO_CHANGE type STRING 
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -738,11 +742,61 @@ ENDFORM.
 * --------------------------------------------------------------------------------------------------+
 * | Static Public Method ZMS_CL_UTILITIES=>REMOVE_SPECIAL_CHAR
 * +-------------------------------------------------------------------------------------------------+
-* | [--->] YV_STRING_TO_CHANGE      TYPE        STRING
+* | [--->] XV_CHAR_NOT_REMOVE       TYPE        STRING
+* | [--->] X_SPACE                  TYPE        FLAG
+* | [--->] X_ALPHA                  TYPE        FLAG
+* | [--->] X_NUM                    TYPE        FLAG
+* | [<---] YV_STRING_TO_CHANGE      TYPE        STRING
 * +-------------------------------------------------------------------------------------------------+
-  FORM remove_special_char CHANGING YV_STRING_TO_CHANGE type STRING.
+  FORM remove_special_char  USING    XV_CHAR_NOT_REMOVE   type STRING   "Caratteri che von vuoi rimuovere
+                            USING    X_SPACE             type FLAG     "Mantieni spazio
+                            USING    X_ALPHA             type FLAG     "Mantieni lettere alfabetiche
+                            USING    X_NUM               type FLAG     "Mantieni numeri
+                            CHANGING YV_STRING_TO_CHANGE type STRING.
+                            
+    "~`!@#$%^&*()-_+={}[]|\/:;"'<>,.? all special char
+    DATA: lv_char      TYPE char1,
+          lv_regex_fix TYPE string VALUE '[^',
+          lv_regex_adt TYPE string,
+          lv_cont      TYPE sy-index.
 
-    "Toglie tutti i caratteri speciali (tranne che io non specifichi \carattere) e lascia le lettere
-    REPLACE ALL OCCURRENCES OF REGEX '[^[:alpha:]\s\-\@]' IN yv_string_to_change WITH ''.
+    IF xv_char_not_remove IS NOT INITIAL
+      OR x_space IS NOT INITIAL
+      OR x_num   IS NOT INITIAL
+      OR x_alpha IS NOT INITIAL.
+
+      CLEAR lv_regex_adt.
+      DO strlen( xv_char_not_remove ) TIMES.
+        CLEAR lv_char.
+        lv_cont = sy-index - 1.
+        lv_char = xv_char_not_remove+lv_cont(1).
+        CHECK NOT lv_regex_adt CA lv_char.
+        IF lv_regex_adt IS INITIAL.
+          lv_regex_adt = '\' && lv_char.
+        ELSE.
+          lv_regex_adt = lv_regex_adt && '\' && lv_char.
+        ENDIF.
+      ENDDO.
+
+      "Non rimuovo le lettere
+      IF x_alpha IS NOT INITIAL.
+        lv_regex_fix = lv_regex_fix && '[:alpha:]'.
+      ENDIF.
+
+      "Non rimuovo lo spazio
+      IF x_space IS NOT INITIAL.
+        lv_regex_fix = lv_regex_fix && '\s'.
+      ENDIF.
+
+      "Non rimuovo i numeri
+      IF x_num IS NOT INITIAL.
+        lv_regex_fix = lv_regex_fix && '\d'.
+      ENDIF.
+
+      lv_regex_fix = lv_regex_fix && lv_regex_adt && ']'.
+
+      REPLACE ALL OCCURRENCES OF REGEX lv_regex_fix IN yv_string_to_change WITH ''.
+
+    ENDIF.
 
   ENDFORM.
