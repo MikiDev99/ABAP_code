@@ -48,6 +48,10 @@ PERFORM REMOVE_SPECIAL_CHAR     using    XV_CHAR_NOT_REMOVE  type STRING   "Cara
                                 using    X_ALPHA             type FLAG     "Mantieni lettere alfabetiche
                                 using    X_NUM               type FLAG     "Mantieni numeri
                                 changing YV_STRING_TO_CHANGE type STRING 
+                                
+"Restituisce un range con i valori del set
+PERFORM GET_VALUE_FORM_SET      using    XV_SETNAME type STRING
+                                changing YT_RANGE   type TT_HRRANGE.
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -800,3 +804,56 @@ ENDFORM.
     ENDIF.
 
   ENDFORM.
+  
+* --------------------------------------------------------------------------------------------------+
+* | Static Public Method ZMS_CL_UTILITIES=>GET_VALUE_FROM_SET
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] XV_SETNAME      TYPE        STRING
+* | [<---] YT_RANGE        TYPE        TT_HRRANGE
+* +-------------------------------------------------------------------------------------------------+
+  FORM get_value_from_set USING    XV_SETNAME type STRING
+                          CHANGING YT_RANGE   type TT_HRRANGE.
+                          
+  TYPES: tt_harrange TYPE TABLE OF harrange.
+  
+  DATA: lv_idset     TYPE sethier-setid,
+        lt_setvalues TYPE STANDARD TABLE OF rgsbv,
+        lv_setname   TYPE c LENGTH 24.
+
+  REFRESH yt_range[].
+
+  lv_setname = xv_setname.
+  CONDENSE lv_setname NO-GAPS.
+
+  "Dato il nome del set restituisce l'id del set
+  "-------------------------------------------------
+  CLEAR lv_idset.
+  CALL FUNCTION 'G_SET_GET_ID_FROM_NAME'
+    EXPORTING
+      shortname = lv_setname       "Set Name
+    IMPORTING
+      new_setid = lv_idset
+    EXCEPTIONS
+      OTHERS    = 1.
+
+  CHECK sy-subrc EQ 0.
+
+  "Dato l'id del set restituisce i valori del set
+  "-------------------------------------------------
+  REFRESH lt_setvalues[].
+  CALL FUNCTION 'G_SET_FETCH'
+    EXPORTING
+      setnr           = lv_idset
+    TABLES
+      set_lines_basic = lt_setvalues[]
+    EXCEPTIONS
+      OTHERS          = 1.
+
+  CHECK lt_setvalues[] IS NOT INITIAL.
+
+  "Costruisco il range con i valori precedentemente ottenuti
+  "-------------------------------------------------
+  yt_range = VALUE #( FOR <range> IN lt_setvalues ( sign = 'I'           opti = 'BT'
+                                                    low  = <range>-from  high = <range>-to ) ).
+
+ ENDFORM.
