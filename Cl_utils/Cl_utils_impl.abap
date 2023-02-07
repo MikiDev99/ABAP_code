@@ -50,7 +50,7 @@ PERFORM REMOVE_SPECIAL_CHAR     using    XV_CHAR_NOT_REMOVE  type STRING   "Cara
                                 changing YV_STRING_TO_CHANGE type STRING 
                                 
 "Restituisce un range con i valori del set
-PERFORM GET_VALUE_FORM_SET      using    XV_SETNAME type STRING
+PERFORM GET_VALUE_FROM_SET      using    XV_SETNAME type STRING
                                 changing YT_RANGE   type TT_HRRANGE.
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
