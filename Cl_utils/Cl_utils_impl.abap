@@ -853,7 +853,19 @@ ENDFORM.
 
   "Costruisco il range con i valori precedentemente ottenuti
   "-------------------------------------------------
-  yt_range = VALUE #( FOR <range> IN lt_setvalues ( sign = 'I'           opti = 'BT'
-                                                    low  = <range>-from  high = <range>-to ) ).
+  LOOP AT lt_setvalues ASSIGNING <value>.
+
+    IF <value>-to IS NOT INITIAL.
+      APPEND INITIAL LINE TO yt_range ASSIGNING <range>.
+      <range>      = 'IBT'.
+      <range>-low  = <value>-from.
+      <range>-high = <value>-to.
+    ELSE.
+      APPEND INITIAL LINE TO yt_range ASSIGNING <range>.
+      <range>      = 'IEQ'.
+      <range>-low  = <value>-from.
+    ENDIF.
+
+  ENDLOOP.
 
  ENDFORM.
