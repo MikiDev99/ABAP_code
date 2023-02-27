@@ -374,6 +374,12 @@ ENDFORM.
     "-------------------------------------------------
     lr_salv_columns = lo_alv->get_columns( ).
     lr_salv_columns->set_optimize( 'X' ). "Stringe le colonne
+    
+    "Set column position
+    "-------------------------------------------------
+    data: grt_columns type ref to cl_salv_columns.
+    grt_columns->set_column_position( columnname = 'TVERSN'
+                                      position   = 1 ).
 
     TRY.
         lr_salv_columns->get_column( 'MANDT' )->set_visible( if_salv_c_bool_sap=>false  ). "Nascondere campi
