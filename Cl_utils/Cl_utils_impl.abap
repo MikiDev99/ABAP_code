@@ -52,7 +52,13 @@ PERFORM REMOVE_SPECIAL_CHAR     using    XV_CHAR_NOT_REMOVE  type STRING   "Cara
 "Restituisce un range con i valori del set
 PERFORM GET_VALUE_FROM_SET      using    XV_SETNAME type STRING
                                 changing YT_RANGE   type TT_HRRANGE.
-
+                                
+"Restituisce una tabella con i record letti da file XML
+PERFORM UPLOAD_LOCAL_XML using    X_FILENAME         type LOCALFILE       "File locale per upload/download
+                                  XV_XML_CUSTOMIZING type STRING          "Nome tabella di customizing
+                                  X_XML_COL_POS      type INT4            "Colonna nome campo xml nel customizing
+                                  X_FIELD_COL_POS    type INT4            "Colonna nome campo output nel customizing
+                         changing YT_OUTPUT          type STANDARD TABLE.
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 * +-------------------------------------------------------------------------------------------------+
@@ -875,3 +881,113 @@ ENDFORM.
   ENDLOOP.
 
  ENDFORM.
+ 
+* --------------------------------------------------------------------------------------------------+
+* | Static Public Method ZMS_CL_UTILITIES=>UPLOAD_LOCAL_XML
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] X_FILENAME         TYPE        LOCALFILE
+* | [--->] XV_XML_CUSTOMIZING TYPE        STRING
+* | [--->] X_XML_COL_POS      TYPE        INT4
+* | [--->] X_FIELD_COL_POS    TYPE        INT4
+* | [<---] YT_OUTPUT          TYPE        STANDARD TABLE
+* +-------------------------------------------------------------------------------------------------+
+ FORM upload_local_xml USING    X_FILENAME         type LOCALFILE
+                                XV_XML_CUSTOMIZING type STRING
+                                X_XML_COL_POS      type INT4
+                                X_FIELD_COL_POS    type INT4
+                       CHANGING YT_OUTPUT          type STANDARD TABLE.
+
+    DATA: lv_subrc      TYPE sy-subrc,
+          lv_xml_string TYPE xstring,
+          lv_size       TYPE sytabix,
+          lv_tabix      TYPE sytabix.
+
+    DATA: lcl_xml TYPE REF TO cl_xml_document.
+
+    DATA: lt_customizing TYPE REF TO data,
+          lt_return      TYPE TABLE OF bapiret2,
+          lt_xml_data    TYPE TABLE OF smum_xmltb.
+
+    FIELD-SYMBOLS: <custom_tb> TYPE STANDARD TABLE.
+
+    "Creazione dinamica tabella di customizing da cui estratte il tracciato XML
+    "-------------------------------------------------
+    CREATE DATA lt_customizing TYPE TABLE OF (xv_xml_customizing).
+    ASSIGN lt_customizing->* TO <custom_tb>.
+
+    CREATE OBJECT lcl_xml.
+
+    "Caricamento da locale di un file XML
+    "-------------------------------------------------
+    CALL METHOD lcl_xml->import_from_file
+      EXPORTING
+        filename = x_filename
+      RECEIVING
+        retcode  = lv_subrc.
+
+    IF lv_subrc = 0.
+
+      CALL METHOD lcl_xml->render_2_xstring
+        IMPORTING
+          retcode = lv_subrc
+          stream  = lv_xml_string
+          size    = lv_size.
+
+      IF lv_subrc = 0.
+
+        "Conversione da file XML in tabella interna
+        "-------------------------------------------------
+        CALL FUNCTION 'SMUM_XML_PARSE'
+          EXPORTING
+            xml_input = lv_xml_string
+          TABLES
+            xml_table = lt_xml_data
+            return    = lt_return.
+
+      ENDIF.
+
+    ENDIF.
+
+    "Estrazione dei dati dalla tabella di customizing
+    "-------------------------------------------------
+    REFRESH <custom_tb>[].
+    SELECT *
+    FROM (xv_xml_customizing)
+      INTO TABLE <custom_tb>.
+    CHECK sy-subrc EQ 0.
+
+    "Creo una tabella di appoggio per gestire le righe dell'XML
+    "-------------------------------------------------
+    DATA(lt_xml_data_app) = lt_xml_data[].
+    DELETE lt_xml_data_app WHERE cvalue IS INITIAL.
+
+    DO.
+
+      IF lt_xml_data_app[] IS INITIAL.
+        EXIT.
+      ENDIF.
+
+      APPEND INITIAL LINE TO yt_output ASSIGNING FIELD-SYMBOL(<output>).
+      LOOP AT <custom_tb> ASSIGNING FIELD-SYMBOL(<custom>).
+
+        ASSIGN COMPONENT x_xml_col_pos OF STRUCTURE <custom> TO FIELD-SYMBOL(<xml_tag>).
+        CHECK sy-subrc EQ 0.
+
+        READ TABLE lt_xml_data_app ASSIGNING FIELD-SYMBOL(<xml>)
+          WITH KEY cname = <xml_tag>.
+        CHECK sy-subrc EQ 0.
+
+        ASSIGN COMPONENT x_field_col_pos OF STRUCTURE <custom> TO FIELD-SYMBOL(<name_field>).
+        CHECK sy-subrc EQ 0.
+
+        ASSIGN COMPONENT <name_field> OF STRUCTURE <output> TO FIELD-SYMBOL(<value>).
+        CHECK sy-subrc EQ 0.
+
+        <value> = <xml>-cvalue.
+        DELETE lt_xml_data_app INDEX sy-tabix.
+
+      ENDLOOP.
+
+    ENDDO.
+
+  ENDFORM.
