@@ -44,9 +44,9 @@ PERFORM GET_STDTXT              using    XV_STDTXT_NAME type THEAD-TDNAME
 
 "Restituisce la stringa rimuovendo i caretteri speciali
 PERFORM REMOVE_SPECIAL_CHAR     using    XV_CHAR_NOT_REMOVE  type STRING   "Caratteri che non vuoi rimuovere
-                                using    X_SPACE             type FLAG     "Mantieni spazio
-                                using    X_ALPHA             type FLAG     "Mantieni lettere alfabetiche
-                                using    X_NUM               type FLAG     "Mantieni numeri
+                                         X_SPACE             type FLAG     "Mantieni spazio
+                                         X_ALPHA             type FLAG     "Mantieni lettere alfabetiche
+                                         X_NUM               type FLAG     "Mantieni numeri
                                 changing YV_STRING_TO_CHANGE type STRING 
                                 
 "Restituisce un range con i valori del set
