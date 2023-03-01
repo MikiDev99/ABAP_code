@@ -43,7 +43,7 @@ PERFORM GET_STDTXT              using    XV_STDTXT_NAME type THEAD-TDNAME
                                 changing YT_STDTXT_OUT  type TT_TLINE
 
 "Restituisce la stringa rimuovendo i caretteri speciali
-PERFORM REMOVE_SPECIAL_CHAR     using    XV_CHAR_NOT_REMOVE  type STRING   "Caratteri che von vuoi rimuovere
+PERFORM REMOVE_SPECIAL_CHAR     using    XV_CHAR_NOT_REMOVE  type STRING   "Caratteri che non vuoi rimuovere
                                 using    X_SPACE             type FLAG     "Mantieni spazio
                                 using    X_ALPHA             type FLAG     "Mantieni lettere alfabetiche
                                 using    X_NUM               type FLAG     "Mantieni numeri
