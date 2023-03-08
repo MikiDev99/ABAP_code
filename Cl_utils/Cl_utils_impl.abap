@@ -62,7 +62,7 @@ PERFORM UPLOAD_LOCAL_XML         using    X_FILENAME         type LOCALFILE     
                          
 "Copia le varianti ALV dei programmi da utente a utente 
 PERFORM COPY_ALV_VARIANTS_U2U     using   XT_VARKEY           type TT_LTDXKEY   "Contiene nome Report, variante, username, handle(vuoto), log_group(vuoto) NB  Valorizzare il campo TYPE sempre ad 'F'
-                                         XT_USERS            type TT_USERS     "Contiene utende da cui copiare e utente per cui copiare                       
+                                          XT_USERS            type TT_USERS     "Contiene utende da cui copiare e utente per cui copiare                       
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 * +-------------------------------------------------------------------------------------------------+
