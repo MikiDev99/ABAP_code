@@ -61,7 +61,7 @@ PERFORM UPLOAD_LOCAL_XML         using    X_FILENAME         type LOCALFILE     
                                  changing YT_OUTPUT          type STANDARD TABLE.
                          
 "Copia le varianti ALV dei programmi da utente a utente 
-PERFORM COPY_ALV_VARIANT_U2U     using   XT_VARKEY           type TT_LTDXKEY   "Contiene nome Report, variante, username, handle(vuoto), log_group(vuoto) NB  Valorizzare il campo TYPE sempre ad 'F'
+PERFORM COPY_ALV_VARIANTS_U2U     using   XT_VARKEY           type TT_LTDXKEY   "Contiene nome Report, variante, username, handle(vuoto), log_group(vuoto) NB  Valorizzare il campo TYPE sempre ad 'F'
                                          XT_USERS            type TT_USERS     "Contiene utende da cui copiare e utente per cui copiare                       
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -1002,7 +1002,7 @@ ENDFORM.
 * | [--->] XT_VARKEY         TYPE        TT_LTDXKEY
 * | [--->] XT_USERS          TYPE        TT_USERS
 * +-------------------------------------------------------------------------------------------------+
- FORM copy_alv_variant_u2u USING XT_VARKEY type TT_LTDXKEY
+ FORM copy_alv_variants_u2u USING XT_VARKEY type TT_LTDXKEY
                                  XT_USERS  type TT_USERS .
  
   "types:    BEGIN OF ty_users,
