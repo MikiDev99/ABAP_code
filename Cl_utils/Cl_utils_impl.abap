@@ -54,11 +54,15 @@ PERFORM GET_VALUE_FROM_SET      using    XV_SETNAME type STRING
                                 changing YT_RANGE   type TT_HRRANGE.
                                 
 "Restituisce una tabella con i record letti da file XML
-PERFORM UPLOAD_LOCAL_XML using    X_FILENAME         type LOCALFILE       "File locale per upload/download
-                                  XV_XML_CUSTOMIZING type STRING          "Nome tabella di customizing
-                                  X_XML_COL_POS      type INT4            "Colonna nome campo xml nel customizing
-                                  X_FIELD_COL_POS    type INT4            "Colonna nome campo output nel customizing
-                         changing YT_OUTPUT          type STANDARD TABLE.
+PERFORM UPLOAD_LOCAL_XML         using    X_FILENAME         type LOCALFILE       "File locale per upload/download
+                                          XV_XML_CUSTOMIZING type STRING          "Nome tabella di customizing
+                                          X_XML_COL_POS      type INT4            "Colonna nome campo xml nel customizing
+                                          X_FIELD_COL_POS    type INT4            "Colonna nome campo output nel customizing
+                                 changing YT_OUTPUT          type STANDARD TABLE.
+                         
+"Copia le varianti ALV dei programmi da utente a utente 
+PERFORM COPY_ALV_VARIANT_U2U     using   XT_VARKEY           type TT_LTDXKEY   "Contiene nome Report, variante, username, handle(vuoto), log_group(vuoto) NB  Valorizzare il campo TYPE sempre ad 'F'
+                                         XT_USERS            type TT_USERS     "Contiene utende da cui copiare e utente per cui copiare                       
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 * +-------------------------------------------------------------------------------------------------+
@@ -897,97 +901,232 @@ ENDFORM.
                                 X_FIELD_COL_POS    type INT4
                        CHANGING YT_OUTPUT          type STANDARD TABLE.
 
-    DATA: lv_subrc      TYPE sy-subrc,
-          lv_xml_string TYPE xstring,
-          lv_size       TYPE sytabix,
-          lv_tabix      TYPE sytabix.
+   DATA: lv_subrc      TYPE sy-subrc,
+         lv_xml_string TYPE xstring,
+         lv_size       TYPE sytabix,
+         lv_tabix      TYPE sytabix.
 
-    DATA: lcl_xml TYPE REF TO cl_xml_document.
+   DATA: lcl_xml TYPE REF TO cl_xml_document.
 
-    DATA: lt_customizing TYPE REF TO data,
-          lt_return      TYPE TABLE OF bapiret2,
-          lt_xml_data    TYPE TABLE OF smum_xmltb.
+   DATA: lt_customizing TYPE REF TO data,
+         lt_return      TYPE TABLE OF bapiret2,
+         lt_xml_data    TYPE TABLE OF smum_xmltb.
 
-    FIELD-SYMBOLS: <custom_tb> TYPE STANDARD TABLE.
+   FIELD-SYMBOLS: <custom_tb> TYPE STANDARD TABLE.
 
-    "Creazione dinamica tabella di customizing da cui estratte il tracciato XML
-    "-------------------------------------------------
-    CREATE DATA lt_customizing TYPE TABLE OF (xv_xml_customizing).
-    ASSIGN lt_customizing->* TO <custom_tb>.
+   "Creazione dinamica tabella di customizing da cui estratte il tracciato XML
+   "-------------------------------------------------
+   CREATE DATA lt_customizing TYPE TABLE OF (xv_xml_customizing).
+   ASSIGN lt_customizing->* TO <custom_tb>.
 
-    CREATE OBJECT lcl_xml.
+   CREATE OBJECT lcl_xml.
 
-    "Caricamento da locale di un file XML
-    "-------------------------------------------------
-    CALL METHOD lcl_xml->import_from_file
-      EXPORTING
-        filename = x_filename
-      RECEIVING
-        retcode  = lv_subrc.
+   "Caricamento da locale di un file XML
+   "-------------------------------------------------
+   CALL METHOD lcl_xml->import_from_file
+     EXPORTING
+       filename = x_filename
+     RECEIVING
+       retcode  = lv_subrc.
 
-    IF lv_subrc = 0.
+   IF lv_subrc = 0.
 
-      CALL METHOD lcl_xml->render_2_xstring
-        IMPORTING
-          retcode = lv_subrc
-          stream  = lv_xml_string
-          size    = lv_size.
+     CALL METHOD lcl_xml->render_2_xstring
+       IMPORTING
+         retcode = lv_subrc
+         stream  = lv_xml_string
+         size    = lv_size.
 
-      IF lv_subrc = 0.
+     IF lv_subrc = 0.
 
-        "Conversione da file XML in tabella interna
-        "-------------------------------------------------
-        CALL FUNCTION 'SMUM_XML_PARSE'
-          EXPORTING
-            xml_input = lv_xml_string
-          TABLES
-            xml_table = lt_xml_data
-            return    = lt_return.
+       "Conversione da file XML in tabella interna
+       "-------------------------------------------------
+       CALL FUNCTION 'SMUM_XML_PARSE'
+         EXPORTING
+           xml_input = lv_xml_string
+         TABLES
+           xml_table = lt_xml_data
+           return    = lt_return.
 
-      ENDIF.
+     ENDIF.
 
-    ENDIF.
+   ENDIF.
 
-    "Estrazione dei dati dalla tabella di customizing
-    "-------------------------------------------------
-    REFRESH <custom_tb>[].
-    SELECT *
-    FROM (xv_xml_customizing)
-      INTO TABLE <custom_tb>.
-    CHECK sy-subrc EQ 0.
+   "Estrazione dei dati dalla tabella di customizing
+   "-------------------------------------------------
+   REFRESH <custom_tb>[].
+   SELECT *
+   FROM (xv_xml_customizing)
+     INTO TABLE <custom_tb>.
+   CHECK sy-subrc EQ 0.
 
-    "Creo una tabella di appoggio per gestire le righe dell'XML
-    "-------------------------------------------------
-    DATA(lt_xml_data_app) = lt_xml_data[].
-    DELETE lt_xml_data_app WHERE cvalue IS INITIAL.
+   "Creo una tabella di appoggio per gestire le righe dell'XML
+   "-------------------------------------------------
+   DATA(lt_xml_data_app) = lt_xml_data[].
+   DELETE lt_xml_data_app WHERE cvalue IS INITIAL.
 
-    DO.
+   DO.
 
-      IF lt_xml_data_app[] IS INITIAL.
-        EXIT.
-      ENDIF.
+     IF lt_xml_data_app[] IS INITIAL.
+       EXIT.
+     ENDIF.
 
-      APPEND INITIAL LINE TO yt_output ASSIGNING FIELD-SYMBOL(<output>).
-      LOOP AT <custom_tb> ASSIGNING FIELD-SYMBOL(<custom>).
+     APPEND INITIAL LINE TO yt_output ASSIGNING FIELD-SYMBOL(<output>).
+     LOOP AT <custom_tb> ASSIGNING FIELD-SYMBOL(<custom>).
 
-        ASSIGN COMPONENT x_xml_col_pos OF STRUCTURE <custom> TO FIELD-SYMBOL(<xml_tag>).
-        CHECK sy-subrc EQ 0.
+       ASSIGN COMPONENT x_xml_col_pos OF STRUCTURE <custom> TO FIELD-SYMBOL(<xml_tag>).
+       CHECK sy-subrc EQ 0.
 
-        READ TABLE lt_xml_data_app ASSIGNING FIELD-SYMBOL(<xml>)
-          WITH KEY cname = <xml_tag>.
-        CHECK sy-subrc EQ 0.
+       READ TABLE lt_xml_data_app ASSIGNING FIELD-SYMBOL(<xml>)
+         WITH KEY cname = <xml_tag>.
+       CHECK sy-subrc EQ 0.
 
-        ASSIGN COMPONENT x_field_col_pos OF STRUCTURE <custom> TO FIELD-SYMBOL(<name_field>).
-        CHECK sy-subrc EQ 0.
+       ASSIGN COMPONENT x_field_col_pos OF STRUCTURE <custom> TO FIELD-SYMBOL(<name_field>).
+       CHECK sy-subrc EQ 0.
 
-        ASSIGN COMPONENT <name_field> OF STRUCTURE <output> TO FIELD-SYMBOL(<value>).
-        CHECK sy-subrc EQ 0.
+       ASSIGN COMPONENT <name_field> OF STRUCTURE <output> TO FIELD-SYMBOL(<value>).
+       CHECK sy-subrc EQ 0.
 
-        <value> = <xml>-cvalue.
-        DELETE lt_xml_data_app INDEX sy-tabix.
+       <value> = <xml>-cvalue.
+       DELETE lt_xml_data_app INDEX sy-tabix.
 
-      ENDLOOP.
+     ENDLOOP.
 
-    ENDDO.
+   ENDDO.
 
-  ENDFORM.
+ ENDFORM.
+
+* --------------------------------------------------------------------------------------------------+
+* | Static Public Method ZMS_CL_UTILITIES=>UPLOAD_LOCAL_XML
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] XT_VARKEY         TYPE        TT_LTDXKEY
+* | [--->] XT_USERS          TYPE        TT_USERS
+* +-------------------------------------------------------------------------------------------------+
+ FORM copy_alv_variant_u2u USING XT_VARKEY type TT_LTDXKEY
+                                 XT_USERS  type TT_USERS .
+ 
+  "types:    BEGIN OF ty_users,
+  "           user_from TYPE slis_user,
+  "           user_to   TYPE slis_user,
+  "         END OF ty_users .
+  "types:  tt_users TYPE TABLE OF ty_users .
+  "types: tt_ltdxkey TYPE TABLE OF ltdxkey .
+    
+   DATA: ls_varkey     TYPE ltdxkey.
+
+   DATA: lt_dbfieldcat   TYPE TABLE OF ltdxdata,
+         lt_dbsortinfo   TYPE TABLE OF ltdxdata,
+         lt_dbfilter     TYPE TABLE OF ltdxdata,
+         lt_dblayout     TYPE TABLE OF ltdxdata,
+         lt_users        TYPE TABLE OF ty_users,
+         lt_user_variant TYPE TABLE OF ltdx.
+
+   FIELD-SYMBOLS: <varkey> LIKE LINE OF xt_varkey,
+                  <users>  LIKE LINE OF lt_users.
+
+   "Controllo che le tabelle delle varianti da copiare
+   "E degli utenti per cui copiarle siano valorizzate
+   "-------------------------------------------------
+   CHECK xt_users[]  IS NOT INITIAL.
+   CHECK xt_varkey[] IS NOT INITIAL.
+
+   REFRESH: lt_dbfieldcat[],
+            lt_dbsortinfo[],
+            lt_dbfilter[],
+            lt_dblayout[],
+            lt_users[].
+
+   "Estraggo tutte le varinati per i report in input
+   "-------------------------------------------------
+   REFRESH lt_user_variant[].
+   SELECT *
+     FROM ltdx
+     INTO TABLE lt_user_variant
+     FOR ALL ENTRIES IN xt_varkey
+     WHERE report EQ xt_varkey-report.
+
+   CHECK sy-subrc EQ 0.
+
+   APPEND LINES OF xt_users TO lt_users.
+   SORT lt_users BY user_from.
+   SORT lt_user_variant BY report username.
+   LOOP AT xt_varkey ASSIGNING <varkey>.
+
+     "Controllo che la variante da copiare esista
+     "-------------------------------------------------
+     READ TABLE lt_user_variant TRANSPORTING NO FIELDS
+       WITH KEY report   = <varkey>-report
+                username = <varkey>-username
+                BINARY SEARCH.
+     CHECK sy-subrc EQ 0.
+
+     CALL FUNCTION 'LT_DBDATA_READ_FROM_LTDX'
+       EXPORTING
+ *         I_TOOL       = 'LT'
+         is_varkey    = <varkey>
+       TABLES
+         t_dbfieldcat = lt_dbfieldcat
+         t_dbsortinfo = lt_dbsortinfo
+         t_dbfilter   = lt_dbfilter
+         t_dblayout   = lt_dblayout
+       EXCEPTIONS
+         not_found    = 1
+         wrong_relid  = 2
+         OTHERS       = 3.
+
+     IF sy-subrc <> 0.
+       MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+               WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+     ENDIF.
+
+     READ TABLE lt_users TRANSPORTING NO FIELDS
+       WITH KEY user_from = <varkey>-username
+                BINARY SEARCH.
+     CHECK sy-subrc EQ 0.
+
+     "Per tutti gli utenti indicati copio la variante
+     "-------------------------------------------------
+     LOOP AT lt_users ASSIGNING <users>.
+       IF <users>-user_from NE <varkey>-username.
+         EXIT.
+       ENDIF.
+
+       "Controllo che la variante da creare per l'untente
+       "non sia già presente evitando di sovrascriverla
+       "-------------------------------------------------
+       READ TABLE lt_user_variant TRANSPORTING NO FIELDS
+         WITH KEY report   = <varkey>-report
+                  username = <users>-user_to
+                  BINARY SEARCH.
+       CHECK sy-subrc <> 0.
+
+       "Setto il nuovo utente e creo la variante
+       "-------------------------------------------------
+       CLEAR ls_varkey.
+       ls_varkey = <varkey>.
+       ls_varkey-username = <users>-user_to.
+
+       CALL FUNCTION 'LT_DBDATA_WRITE_TO_LTDX'
+         EXPORTING
+ *           I_TOOL       = 'LT'
+           is_varkey    = ls_varkey
+ *           IS_VARIANT   =
+         TABLES
+           t_dbfieldcat = lt_dbfieldcat
+           t_dbsortinfo = lt_dbsortinfo
+           t_dbfilter   = lt_dbfilter
+           t_dblayout   = lt_dblayout
+         EXCEPTIONS
+           not_found    = 1
+           wrong_relid  = 2
+           OTHERS       = 3.
+       IF sy-subrc <> 0.
+         MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+       ENDIF.
+
+     ENDLOOP.
+
+   ENDLOOP.
+
+ ENDFORM.
