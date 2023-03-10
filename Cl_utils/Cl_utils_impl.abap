@@ -62,7 +62,10 @@ PERFORM UPLOAD_LOCAL_XML         using    X_FILENAME         type LOCALFILE     
                          
 "Copia le varianti ALV dei programmi da utente a utente 
 PERFORM COPY_ALV_VARIANTS_U2U     using   XT_VARKEY           type TT_LTDXKEY   "Contiene nome Report, variante, username, handle(vuoto), log_group(vuoto) NB  Valorizzare il campo TYPE sempre ad 'F'
-                                          XT_USERS            type TT_USERS     "Contiene utende da cui copiare e utente per cui copiare                       
+                                          XT_USERS            type TT_USERS     "Contiene utende da cui copiare e utente per cui copiare
+                                          
+  "Gestisce immagine nella selection screen
+  PERFORM picture_control.
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 * +-------------------------------------------------------------------------------------------------+
@@ -1130,3 +1133,94 @@ ENDFORM.
    ENDLOOP.
 
  ENDFORM.
+ 
+ 
+ FORM picture_control.
+ 
+ "GoTo 
+ "T-code SMW0 -> 
+ "Seleziona Dati binari per applicazioni WebRfc -> 
+ "Se tipo Mime già presente -> 
+ "Creare e selezionare immagine da desktop
+ 
+ "Altrimenti ->
+ "Parametrizzazione ->
+ "Agg. Tipo Mime e specificare il formato ES .png ->
+ "Creare e selezionare immagine da desktop
+                                                                                                  
+  DATA: x_type      LIKE w3param-cont_type,
+        x_lenght    LIKE w3param-cont_len,
+        pic_tab     LIKE w3mime OCCURS 0,
+        pic_size    TYPE i,
+        query_table LIKE w3query OCCURS 1 WITH HEADER LINE,
+        html_table  LIKE w3html OCCURS 1,
+        return_code LIKE w3param-ret_code,
+        ec_docking  TYPE REF TO cl_gui_docking_container,
+        ec_picture  TYPE REF TO cl_gui_picture,
+        ec_url(256) TYPE c.
+  
+  "Controllo che il programma non sia lanciato in batch altrimenti dumpa
+  CHECK sy-batch EQ space.
+  CREATE OBJECT ec_picture
+    EXPORTING
+      parent = ec_docking.
+  CHECK sy-subrc = 0.
+
+  "Imposta i bordi
+  CALL METHOD ec_picture->set_3d_border
+    EXPORTING
+      border = 0.
+  CALL METHOD ec_picture->set_display_mode
+    EXPORTING
+      display_mode = cl_gui_picture=>display_mode_stretch.
+
+  "Imposta posizione e dimensione immagine
+  CALL METHOD ec_picture->set_position
+    EXPORTING
+      height = 165
+      left   = 130 "per centrarlo
+      top    = 0
+      width  = 580.
+
+  IF ec_url IS INITIAL.
+  
+    REFRESH query_table.
+    query_table-name  = '_OBJECT_ID'.
+    query_table-value = 'ZARCH_SCHEDULER_LOGO'. "Nome immagine
+    APPEND query_table.
+    CALL FUNCTION 'WWW_GET_MIME_OBJECT'
+      TABLES
+        query_string        = query_table
+        html                = html_table
+        mime                = pic_tab
+      CHANGING
+        return_code         = return_code
+        content_type        = x_type
+        content_length      = x_lenght
+      EXCEPTIONS
+        object_not_found    = 1
+        parameter_not_found = 2
+        OTHERS              = 3.
+    IF sy-subrc <> 0.
+*    // Handle exceptions here
+    ENDIF.
+
+    CALL FUNCTION 'DP_CREATE_URL'
+      EXPORTING
+        type     = 'IMAGE'
+        subtype  = cndp_sap_tab_unknown
+        size     = pic_size
+        lifetime = cndp_lifetime_transaction
+      TABLES
+        data     = pic_tab
+      CHANGING
+        url      = ec_url
+      EXCEPTIONS
+        OTHERS   = 1.
+  ENDIF.
+  
+  CALL METHOD ec_picture->load_picture_from_url
+    EXPORTING
+      url = ec_url.
+      
+ENDFORM.                    
