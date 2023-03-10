@@ -65,7 +65,7 @@ PERFORM COPY_ALV_VARIANTS_U2U     using   XT_VARKEY           type TT_LTDXKEY   
                                           XT_USERS            type TT_USERS     "Contiene utende da cui copiare e utente per cui copiare
                                           
   "Gestisce immagine nella selection screen
-  PERFORM picture_control.
+PERFORM PICTURE_CONTROL_SEL_SCREEN.
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 * +-------------------------------------------------------------------------------------------------+
@@ -1135,7 +1135,7 @@ ENDFORM.
  ENDFORM.
  
  
- FORM picture_control.
+ FORM picture_control_sel_screen.
  
  "GoTo 
  "T-code SMW0 -> 
