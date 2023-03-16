@@ -833,7 +833,7 @@ ENDFORM.
   FORM get_value_from_set USING    XV_SETNAME type STRING
                           CHANGING YT_RANGE   type TT_HRRANGE.
                           
-  TYPES: tt_harrange TYPE TABLE OF harrange.
+  TYPES: tt_hrrange TYPE TABLE OF hrrange.
   
   DATA: lv_idset     TYPE sethier-setid,
         lt_setvalues TYPE STANDARD TABLE OF rgsbv,
