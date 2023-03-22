@@ -342,14 +342,16 @@ ENDFORM.
                            CHANGING XT_TABLE type STANDARD TABLE..
 
     DATA: lv_lines TYPE i,
-          lv_title TYPE lvc_title.
+          lv_title TYPE lvc_title,
+          ls_key   TYPE salv_s_layout_key.
 
     DATA: lo_alv            TYPE REF TO cl_salv_table,
           lr_salv_columns   TYPE REF TO cl_salv_columns_table,
           lr_salv_functions TYPE REF TO cl_salv_functions_list,
           lr_salv_dsp_set   TYPE REF TO cl_salv_display_settings,
           lr_salv_events    TYPE REF TO cl_salv_events_table,
-          lr_selections     TYPE REF TO cl_salv_selections.
+          lr_selections     TYPE REF TO cl_salv_selections,
+          lr_layout         TYPE REF TO cl_salv_layout.
 
     CLEAR: lv_lines, lv_title.
     TRY.
@@ -447,7 +449,16 @@ ENDFORM.
     "CREATE OBJECT gr_salv_event_handler.
     "SET HANDLER gr_salv_event_handler->link_click  FOR lr_salv_events.
     "SET HANDLER gr_salv_event_handler->double_click FOR lr_salv_events.
-
+    
+    "Creare e salvare il layout
+    "-------------------------------------------------
+    CLEAR ls_key.
+    lr_layout = lo_alv->get_layout( ).
+    ls_key-report = sy-repid.
+    lr_layout->set_key( ls_key ).
+    lr_layout->set_default( 'X' ).
+    lr_layout->set_save_restriction( if_salv_c_layout=>restrict_none ).
+     
     "Seleziona più righe
     "-------------------------------------------------
     lr_selections = lo_alv->get_selections( ).
