@@ -383,7 +383,7 @@ ENDFORM.
     lr_salv_dsp_set->set_striped_pattern( 'X' ).  "Layout zebra
 
     lv_lines = lines( xt_table[] ).
-    lv_title = xv_title && ' (' && lv_lines && ' Record )'.
+    lv_title = xv_title && ' (' && lv_lines && ' Record)'.
     lr_salv_dsp_set->set_list_header( lv_title ). "Titolo ALV
 
     "Set column settings
