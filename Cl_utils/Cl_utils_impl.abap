@@ -351,7 +351,8 @@ ENDFORM.
           lr_salv_dsp_set   TYPE REF TO cl_salv_display_settings,
           lr_salv_events    TYPE REF TO cl_salv_events_table,
           lr_selections     TYPE REF TO cl_salv_selections,
-          lr_layout         TYPE REF TO cl_salv_layout.
+          lr_layout         TYPE REF TO cl_salv_layout,
+          lr_aggregations   TYPE REF TO cl_salv_aggregations.
 
     CLEAR: lv_lines, lv_title.
     TRY.
@@ -458,6 +459,28 @@ ENDFORM.
     lr_layout->set_key( ls_key ).
     lr_layout->set_default( 'X' ).
     lr_layout->set_save_restriction( if_salv_c_layout=>restrict_none ).
+    
+    "Serve per fare i totali del/dei campi
+    "-------------------------------------------------
+    lr_aggregations = lo_alv->get_aggregations( ).
+  
+    TRY.
+        lr_aggregations->add_aggregation(
+          columnname  = 'NETTOBTR'
+          aggregation = if_salv_c_aggregation=>AVERAGE
+          "TOTAL    Gives the total of the values
+          "MINIMUM  Gives the minimum of the values
+          "MAXIMUM  Gives the maximum of the values
+          "AVERAGE  Gives the average of the values
+          "NONE	    No aggregation ).
+      CATCH cx_salv_data_error.
+      CATCH cx_salv_not_found.
+      CATCH cx_salv_existing.
+    ENDTRY.
+
+    "Visualizzo totale prima degli oggetti
+    "-------------------------------------------------
+    lr_aggregations->set_aggregation_before_items( ). 
      
     "Seleziona più righe
     "-------------------------------------------------
