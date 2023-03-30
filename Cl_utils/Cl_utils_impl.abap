@@ -908,7 +908,7 @@ ENDFORM.
   "-------------------------------------------------
   LOOP AT lt_setvalues ASSIGNING <value>.
 
-    IF <value>-to IS NOT INITIAL.
+    IF <value>-from NE <value>-to.
       APPEND INITIAL LINE TO yt_range ASSIGNING <range>.
       <range>      = 'IBT'.
       <range>-low  = <value>-from.
