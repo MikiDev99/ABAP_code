@@ -278,35 +278,89 @@ FORM upload_local_excel using     XV_FILENAME    TYPE STRING
  FORM help_f4_input_dir using X_OPTION  TYPE CHAR1
                               XV_TITLE  TYPE STRING OPTIONAL
                               YV_DIR    TYPE STRING.
+                              
+   DATA: lt_filetable  TYPE filetable,
+          lcl_ref_itab TYPE REF TO file_table,
+          lv_rc        TYPE i.
+
 
     "Ricordati lo user command nei radio button
     CASE x_option.
 
       WHEN 'L'.
-
-        CALL METHOD cl_gui_frontend_services=>directory_browse
-          EXPORTING
-            window_title    = xv_title
-            initial_folder  = yv_dir
+      
+        "Prendo la directory iniziale ovvero il desktop
+        CALL METHOD cl_gui_frontend_services=>get_desktop_directory
           CHANGING
-            selected_folder = yv_dir.
+            desktop_directory = yv_dir
+          EXCEPTIONS
+            cntl_error        = 1.
+        IF sy-subrc <> 0.
+          MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                     WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+        ENDIF.
+        CALL METHOD cl_gui_cfw=>update_view.
+            
+        "Prendo il file/cartella locale
+        CALL METHOD cl_gui_frontend_services=>file_open_dialog
+          EXPORTING
+            window_title     = xv_title
+            default_filename = '*.csv' "DUMMY per le cartelle
+            multiselection   = ''
+          CHANGING
+            file_table       = lt_filetable
+            rc               = lv_rc.
+        READ TABLE lt_filetable REFERENCE INTO lcl_ref_itab INDEX 1.
+        IF lcl_ref_itab IS NOT INITIAL.
+          yv_dir = lcl_ref_itab->filename.
+        ENDIF.
 
       WHEN 'S'.
 
-        "Selezionre cartella da server
+        "Selezionre cartella o file da server
         CALL FUNCTION '/SAPDMC/LSM_F4_SERVER_FILE'
           EXPORTING
             directory        = yv_dir
-            filemask         = '?'
+            filemask         = '?' "DUMMY per le cartelle
           IMPORTING
             serverfile       = yv_dir
           EXCEPTIONS
             canceled_by_user = 1
             OTHERS           = 2.
         IF sy-subrc <> 0.
-
+          MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                     WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
         ENDIF.
+        
+        "Solo per file
+        DATA: lv_server         TYPE msxxlist-name,
+              lv_instancenumber TYPE instanz-systemnr,
+              lv_path           TYPE dxfields-longpath.
 
+          lv_instancenumber = ''.
+          CALL FUNCTION 'GET_SYSTEM_NUMBER'
+            IMPORTING
+              instancenumber = lv_instancenumber.
+
+          CONCATENATE sy-host '_' sy-sysid '_' lv_instancenumber INTO lv_server.
+          CONDENSE lv_server NO-GAPS.
+
+          CALL FUNCTION 'F4_DXFILENAME_TOPRECURSION'
+            EXPORTING
+              i_location_flag       = 'A'        " A - Applikationsserver, P - Presentationsserver
+              i_server              = lv_server        " ? - Per scegliere application server, ' ' - akt. Anmeldeserver, sonst Servernamen eintragen
+              i_path                = '/tmp' " Eventuale directory di default
+              filemask              = '*.*'
+              fileoperation         = 'R'
+            IMPORTING
+              o_path                = lv_path
+            EXCEPTIONS
+              communication_failure = 1
+              system_failure        = 2
+              rfc_error             = 3.
+
+          CHECK sy-subrc EQ 0.
+          p_path = lv_path.
       WHEN OTHERS.
     ENDCASE.
 
