@@ -1,0 +1,56 @@
+*&---------------------------------------------------------------------*
+*& Report ZMIGR_CONTROLLA_FILE
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zmigr_controlla_file.
+
+INCLUDE zmigr_controlla_file_top.
+INCLUDE zmigr_controlla_file_scr.
+INCLUDE zmigr_controlla_file_f01.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_ecc.
+  PERFORM help_f4_file USING 'P_ECC' '*.csv'.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_s4.
+  PERFORM help_f4_file USING 'P_S4' '*.csv'.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_path.
+  PERFORM help_f4_file USING 'P_PATH' '*DUMMY'.
+
+AT SELECTION-SCREEN OUTPUT.
+  PERFORM screen_controller.
+
+START-OF-SELECTION.
+
+  "Controllo i parametri di selezione
+  "-------------------------------------------------
+  PERFORM check_input.
+
+  "Setta struttura e chiave dei file di input
+  "-------------------------------------------------
+  PERFORM set_file_struct.
+
+  "Recupero i file dei due sistemi
+  "-------------------------------------------------
+  PERFORM get_files.
+
+  "Ricava gli scarti tra i due file
+  "-------------------------------------------------
+  PERFORM elab_files.
+
+  "Converte le tabelle contenti i file in tabelle di tipo DDCI
+  "-------------------------------------------------
+  PERFORM convert_data.
+
+  "Ricava i singoli campi che non coincidono tra i due file
+  "-------------------------------------------------
+  PERFORM get_scarti.
+
+  "Creo il file di output ed effettua il download
+  "-------------------------------------------------
+  PERFORM download_file.
+
+  "Mostro il file degli scarti
+  "-------------------------------------------------
+  PERFORM display_generic_alv.

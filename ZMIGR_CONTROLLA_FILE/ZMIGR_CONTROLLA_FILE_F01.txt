@@ -1,0 +1,1223 @@
+*&---------------------------------------------------------------------*
+*& Include          ZMIGR_CONTROLLA_FILE_F01
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*& Form help_f4_file
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM help_f4_file USING x_field
+                        x_filemask.
+
+  DATA: lt_filetable TYPE filetable,
+        lcl_ref_itab TYPE REF TO file_table,
+        lv_rc        TYPE i.
+
+  DATA: lv_file TYPE string.
+
+  CASE 'X'.
+    WHEN rb_loc.
+
+      IF x_filemask EQ '*DUMMY'.
+
+        PERFORM select_folder.
+
+      ELSE.
+
+        CALL METHOD cl_gui_frontend_services=>file_open_dialog
+          EXPORTING
+            default_filename = x_filemask
+          CHANGING
+            file_table       = lt_filetable
+            rc               = lv_rc.
+        READ TABLE lt_filetable REFERENCE INTO lcl_ref_itab INDEX 1.
+        IF lcl_ref_itab IS NOT INITIAL.
+          IF x_field EQ 'P_ECC' .
+            p_ecc = lcl_ref_itab->filename.
+          ELSEIF x_field EQ 'P_S4'.
+            p_s4 = lcl_ref_itab->filename..
+          ENDIF.
+        ENDIF.
+
+      ENDIF.
+
+
+    WHEN rb_ser.
+
+      CLEAR lv_file.
+      CALL FUNCTION '/SAPDMC/LSM_F4_SERVER_FILE'
+        EXPORTING
+          directory        = ' '
+          filemask         = x_filemask
+        IMPORTING
+          serverfile       = lv_file
+        EXCEPTIONS
+          canceled_by_user = 1
+          OTHERS           = 2.
+      IF sy-subrc EQ 0.
+        IF x_field EQ 'P_ECC' .
+          p_ecc = lv_file.
+        ELSEIF x_field EQ 'P_S4'.
+          p_s4 = lv_file.
+        ELSE.
+          p_path = lv_file.
+        ENDIF.
+      ENDIF.
+
+  ENDCASE.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form check_input
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM check_input .
+
+  IF p_ecc IS INITIAL.
+    MESSAGE s646(db) WITH TEXT-e00 DISPLAY LIKE 'E'.
+    STOP.
+  ENDIF.
+
+  IF p_s4 IS INITIAL.
+    MESSAGE s646(db) WITH TEXT-e01 DISPLAY LIKE 'E'.
+    STOP.
+  ENDIF.
+
+  IF p_path IS INITIAL.
+    MESSAGE s646(db) WITH TEXT-e05 DISPLAY LIKE 'E'.
+    STOP.
+  ENDIF.
+
+  IF sy-batch IS NOT INITIAL
+   AND rb_loc IS NOT INITIAL.
+    MESSAGE s646(db) WITH TEXT-e06 DISPLAY LIKE 'E'.
+    STOP.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form screen_controller
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM screen_controller .
+
+  "Grantisce file dellastessa sorgente
+  "-------------------------------------------------
+  IF gv_active_rb IS INITIAL.
+
+    CLEAR gv_active_rb.
+    gv_active_rb = 'L'.
+
+  ELSEIF gv_active_rb EQ 'L'
+    AND rb_ser EQ 'X'.
+
+    gv_active_rb = 'S'.
+    CLEAR p_ecc.
+    CLEAR p_s4.
+    CLEAR p_path.
+
+  ELSEIF gv_active_rb EQ 'S'
+    AND rb_loc EQ 'X'.
+
+    gv_active_rb = 'L'.
+    CLEAR p_ecc.
+    CLEAR p_s4.
+    CLEAR p_path.
+
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form get_files
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM get_files .
+
+  REFRESH gt_ecc[].
+  REFRESH gt_s4[].
+  CASE 'X'.
+    WHEN rb_loc.
+      PERFORM get_local_files.
+    WHEN rb_ser.
+      PERFORM get_server_files.
+  ENDCASE.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form get_local_files
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM get_local_files .
+
+  IF sy-batch IS NOT INITIAL.
+    MESSAGE s646(db) WITH TEXT-i01 DISPLAY LIKE 'W'.
+    STOP.
+  ENDIF.
+
+  "Ricavo il file del sistema ECC
+  "-------------------------------------------------
+  CALL FUNCTION 'GUI_UPLOAD'
+    EXPORTING
+      filename                = p_ecc
+    TABLES
+      data_tab                = gt_ecc[]
+*          CHANGING
+*     ISSCANPERFORMED         = ' '
+    EXCEPTIONS
+      file_open_error         = 1
+      file_read_error         = 2
+      no_batch                = 3
+      gui_refuse_filetransfer = 4
+      invalid_type            = 5
+      no_authority            = 6
+      unknown_error           = 7
+      bad_data_format         = 8
+      header_not_allowed      = 9
+      separator_not_allowed   = 10
+      header_too_long         = 11
+      unknown_dp_error        = 12
+      access_denied           = 13
+      dp_out_of_memory        = 14
+      disk_full               = 15
+      dp_timeout              = 16
+      OTHERS                  = 17.
+  IF sy-subrc <> 0.
+    MESSAGE s646(db) WITH TEXT-e02 DISPLAY LIKE 'E'.
+    STOP.
+  ENDIF.
+
+  "Ricavo il file del sistema S4 HANA
+  "-------------------------------------------------
+  CALL FUNCTION 'GUI_UPLOAD'
+    EXPORTING
+      filename                = p_s4
+    TABLES
+      data_tab                = gt_s4[]
+*          CHANGING
+*     ISSCANPERFORMED         = ' '
+    EXCEPTIONS
+      file_open_error         = 1
+      file_read_error         = 2
+      no_batch                = 3
+      gui_refuse_filetransfer = 4
+      invalid_type            = 5
+      no_authority            = 6
+      unknown_error           = 7
+      bad_data_format         = 8
+      header_not_allowed      = 9
+      separator_not_allowed   = 10
+      header_too_long         = 11
+      unknown_dp_error        = 12
+      access_denied           = 13
+      dp_out_of_memory        = 14
+      disk_full               = 15
+      dp_timeout              = 16
+      OTHERS                  = 17.
+  IF sy-subrc <> 0.
+    MESSAGE s646(db) WITH TEXT-e03 DISPLAY LIKE 'E'.
+    STOP.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form get_server_files
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM get_server_files .
+
+  DATA:lv_fname TYPE rlgrap-filename.
+
+  FIELD-SYMBOLS: <file> LIKE LINE OF gt_ecc.
+
+  "Ricavo il file del sistema ECC
+  "-------------------------------------------------
+  CLEAR lv_fname.
+  lv_fname = p_ecc.
+
+  OPEN DATASET lv_fname FOR INPUT IN TEXT MODE ENCODING DEFAULT.
+  IF sy-subrc <> 0.
+    CLOSE DATASET lv_fname.
+    MESSAGE s646(db) WITH TEXT-e04 ' ' lv_fname DISPLAY LIKE 'E'.
+    STOP.
+  ENDIF.
+
+  DO.
+
+    APPEND INITIAL LINE TO gt_ecc ASSIGNING <file>.
+    READ DATASET lv_fname INTO <file>-dato.
+    IF sy-subrc <> 0.
+      EXIT.
+    ENDIF.
+
+  ENDDO.
+  CLOSE DATASET lv_fname.
+
+  "Ricavo il file del sistema S4 HANA
+  "-------------------------------------------------
+  CLEAR lv_fname.
+  lv_fname = p_s4.
+
+  OPEN DATASET lv_fname FOR INPUT IN TEXT MODE ENCODING DEFAULT.
+  IF sy-subrc <> 0.
+    CLOSE DATASET lv_fname.
+    MESSAGE s646(db) WITH TEXT-e04 ' ' lv_fname DISPLAY LIKE 'E'.
+    STOP.
+  ENDIF.
+
+  DO.
+
+    APPEND INITIAL LINE TO gt_ecc ASSIGNING <file>.
+    READ DATASET lv_fname INTO <file>-dato.
+    IF sy-subrc <> 0.
+      EXIT.
+    ENDIF.
+
+  ENDDO.
+  CLOSE DATASET lv_fname.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form elab_files
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM elab_files .
+
+  DATA: lv_row_ecc TYPE string,
+        lv_row_s4  TYPE string.
+
+  FIELD-SYMBOLS: <s4>     LIKE LINE OF gt_s4,
+                 <ecc>    LIKE LINE OF gt_ecc,
+                 <scarto> LIKE LINE OF gt_file_scarti_ecc.
+
+  REFRESH gt_file_scarti_ecc[].
+  REFRESH gt_file_scarti_s4[].
+
+  "Ricavo gli scarti per i due file
+  "-------------------------------------------------
+  SORT gt_s4.
+  SORT gt_ecc.
+
+  LOOP AT gt_ecc ASSIGNING <ecc>.
+
+    READ TABLE gt_s4 ASSIGNING <s4>
+      WITH KEY dato = <ecc>-dato
+               BINARY SEARCH.
+    IF sy-subrc NE 0.
+      APPEND INITIAL LINE TO gt_file_scarti_ecc ASSIGNING <scarto>.
+      <scarto>-dato = <ecc>-dato.
+    ENDIF.
+
+  ENDLOOP.
+
+  LOOP AT gt_s4 ASSIGNING <s4>.
+
+    READ TABLE gt_ecc ASSIGNING <ecc>
+      WITH KEY dato = <s4>-dato
+               BINARY SEARCH.
+    IF sy-subrc NE 0.
+      APPEND INITIAL LINE TO gt_file_scarti_s4 ASSIGNING <scarto>.
+      <scarto>-dato = <s4>-dato.
+    ENDIF.
+
+  ENDLOOP.
+
+  IF gt_file_scarti_ecc[] IS INITIAL
+   AND gt_file_scarti_s4[] IS INITIAL.
+    MESSAGE s646(db) WITH TEXT-s00.
+    STOP.
+  ENDIF.
+
+  FREE gt_ecc[].
+  FREE gt_s4[].
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form download_file
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM download_file .
+
+  SORT gt_file_scarti BY ref_chiave chiave_ecc chiave_s4 count.
+  DELETE ADJACENT DUPLICATES FROM gt_file_scarti COMPARING ref_chiave chiave_ecc chiave_s4 count.
+
+  "Creo la testata e i record del file di output
+  "-------------------------------------------------
+  REFRESH gt_csv[].
+  APPEND INITIAL LINE TO gt_csv ASSIGNING FIELD-SYMBOL(<testata>).
+  CONCATENATE 'CAMPI CHIAVE' 'VALORE CHIAVE ECC' 'VALORE CHIAVE S4' 'PROGRESSIVO' 'CAMPO IN ERRORE' 'DESCRIZIONE ERRORE' INTO <testata> SEPARATED BY ';'.
+
+  LOOP AT gt_file_scarti ASSIGNING FIELD-SYMBOL(<scarto>).
+    APPEND INITIAL LINE TO gt_csv ASSIGNING FIELD-SYMBOL(<csv>).
+    REPLACE ALL OCCURRENCES OF ';' IN <scarto>-chiave_ecc WITH '|'.
+    REPLACE ALL OCCURRENCES OF ';' IN <scarto>-chiave_s4 WITH '|'.
+    CONCATENATE <scarto>-ref_chiave <scarto>-chiave_ecc <scarto>-chiave_s4
+                <scarto>-count      <scarto>-ref_delta  <scarto>-descrizione
+                INTO <csv> SEPARATED BY ';'.
+  ENDLOOP.
+
+  CASE 'X'.
+    WHEN rb_loc.
+      PERFORM write_file_local.
+    WHEN rb_ser.
+      PERFORM write_file_server.
+  ENDCASE.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form select_folder
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM select_folder .
+
+  cl_gui_frontend_services=>directory_browse(
+*   EXPORTING
+*     window_title         =
+*     initial_folder       =
+    CHANGING
+      selected_folder      =  p_path
+    EXCEPTIONS
+      cntl_error           = 1
+      error_no_gui         = 2
+      not_supported_by_gui = 3
+      OTHERS               = 4
+  ).
+  IF sy-subrc <> 0.
+    MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+      WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form write_file_server
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM write_file_server .
+
+  DATA lv_file TYPE string.
+
+  CLEAR lv_file.
+  lv_file = p_path && '/' && sy-repid && '_' && sy-datum && '.csv'.
+
+  OPEN DATASET lv_file FOR OUTPUT IN TEXT MODE ENCODING DEFAULT.
+  IF sy-subrc NE 0.
+    CLOSE DATASET lv_file.
+    MESSAGE s646(db) WITH TEXT-e07 DISPLAY LIKE 'E'.
+    STOP.
+  ENDIF.
+
+  LOOP AT gt_csv ASSIGNING FIELD-SYMBOL(<csv>).
+
+    TRANSFER <csv> TO lv_file.
+
+  ENDLOOP.
+  CLOSE DATASET lv_file.
+  MESSAGE s646(db) WITH TEXT-s01.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form write_file_local
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM write_file_local .
+
+  DATA lv_file TYPE string.
+
+  CLEAR lv_file.
+  lv_file = p_path && '\' && sy-repid && '_' && sy-datum && '.csv'.
+
+  CHECK sy-batch IS INITIAL.
+  CALL FUNCTION 'GUI_DOWNLOAD'
+    EXPORTING
+      filename                = lv_file
+* IMPORTING
+*     FILELENGTH              =
+    TABLES
+      data_tab                = gt_csv[]
+*     FIELDNAMES              =
+    EXCEPTIONS
+      file_write_error        = 1
+      no_batch                = 2
+      gui_refuse_filetransfer = 3
+      invalid_type            = 4
+      no_authority            = 5
+      unknown_error           = 6
+      header_not_allowed      = 7
+      separator_not_allowed   = 8
+      filesize_not_allowed    = 9
+      header_too_long         = 10
+      dp_error_create         = 11
+      dp_error_send           = 12
+      dp_error_write          = 13
+      unknown_dp_error        = 14
+      access_denied           = 15
+      dp_out_of_memory        = 16
+      disk_full               = 17
+      dp_timeout              = 18
+      file_not_found          = 19
+      dataprovider_exception  = 20
+      control_flush_error     = 21
+      OTHERS                  = 22.
+  IF sy-subrc <> 0.
+    MESSAGE s646(db) WITH TEXT-e07 DISPLAY LIKE 'E'.
+    STOP.
+  ELSE.
+    MESSAGE s646(db) WITH TEXT-s01.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form display_generic_alv
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM display_generic_alv .
+
+  DATA: lv_lines TYPE string,
+        lv_title TYPE lvc_title.
+
+  DATA: lo_alv            TYPE REF TO cl_salv_table,
+        lr_salv_columns   TYPE REF TO cl_salv_columns_table,
+        lr_salv_functions TYPE REF TO cl_salv_functions_list,
+        lr_salv_dsp_set   TYPE REF TO cl_salv_display_settings,
+        lr_salv_events    TYPE REF TO cl_salv_events_table,
+        lr_selections     TYPE REF TO cl_salv_selections,
+        lr_column         TYPE REF TO cl_salv_column_table.
+
+  CHECK gt_file_scarti[] IS NOT INITIAL.
+
+  CLEAR: lv_lines, lv_title.
+  TRY.
+      cl_salv_table=>factory(
+        IMPORTING
+          r_salv_table   =  lo_alv                    " Basis Class Simple ALV Tables
+        CHANGING
+          t_table        =  gt_file_scarti[]
+      ).
+    CATCH cx_salv_msg.
+  ENDTRY.
+
+  "Set functions
+  "-------------------------------------------------
+  lr_salv_functions = lo_alv->get_functions( ).
+  lr_salv_functions->set_all( 'X' ). "Lista toolbar standard
+
+  "Set output control
+  "-------------------------------------------------
+  lr_salv_dsp_set = lo_alv->get_display_settings( ).
+  lr_salv_dsp_set->set_striped_pattern( 'X' ).  "Layout zebra
+
+  lv_lines = lines( gt_file_scarti[] ).
+  CONDENSE lv_lines NO-GAPS.
+
+  CONCATENATE 'File log scarti (' lv_lines ' Record)'  INTO lv_title RESPECTING BLANKS.
+  lr_salv_dsp_set->set_list_header( lv_title ). "Titolo ALV
+
+  "Set column settings
+  "-------------------------------------------------
+  lr_salv_columns = lo_alv->get_columns( ).
+  lr_salv_columns->set_optimize( 'X' ). "Stringe le colonne
+
+  TRY.
+      lr_column ?= lr_salv_columns->get_column( 'CHIAVE_ECC' ).
+      lr_column->set_long_text( 'Valore chiave ECC' ).
+      lr_column ?= lr_salv_columns->get_column( 'CHIAVE_S4' ).
+      lr_column->set_long_text( 'Valore chiave S4' ).
+      lr_column ?= lr_salv_columns->get_column( 'COUNT' ).
+      lr_column->set_long_text( 'Progressivo' ).
+      lr_column ?= lr_salv_columns->get_column( 'REF_CHIAVE' ).
+      lr_column->set_long_text( 'Campi chiave' ).
+      lr_column ?= lr_salv_columns->get_column( 'REF_DELTA' ).
+      lr_column->set_long_text( 'Campo in errore' ).
+      lr_column ?= lr_salv_columns->get_column( 'DESCRIZIONE' ).
+      lr_column->set_long_text( 'Descrizione errore' ).
+    CATCH cx_salv_not_found.
+  ENDTRY.
+
+  "Seleziona più righe
+  "-------------------------------------------------
+  lr_selections = lo_alv->get_selections( ).
+  lr_selections->set_selection_mode( if_salv_c_selection_mode=>row_column ).
+
+  "Output the table
+  "-------------------------------------------------
+  lo_alv->display( ).
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form set_file_struct
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM set_file_struct .
+
+  FIELD-SYMBOLS: <field> LIKE LINE OF gt_ordtab.
+
+  "Assegno struttura e chiave del file
+  "-------------------------------------------------
+  CLEAR: gv_file_struct, gv_file_key.
+  CLEAR: gv_key1, gv_key2, gv_key3, gv_key4.
+
+  REFRESH gt_ordtab[].
+  CASE 'X'.
+    WHEN rb_bp.
+
+      gv_file_struct = 'TY_BP'.
+      gv_file_key    = 'PARTNER'.
+      gv_key1        = gv_file_key.
+      APPEND INITIAL LINE TO gt_ordtab ASSIGNING <field>.
+      <field>-name   = gv_key1.
+      <field>-astext = abap_true.
+
+    WHEN rb_cont.
+
+      gv_file_struct = 'TY_CONTRACT'.
+      gv_file_key    = 'VERTRAG'.
+      gv_key1        = gv_file_key.
+
+      APPEND INITIAL LINE TO gt_ordtab ASSIGNING <field>.
+      <field>-name   = gv_key1.
+      <field>-astext = abap_true.
+
+    WHEN rb_bill.
+
+      gv_file_struct = 'TY_BILLDOC'.
+      gv_key1 = 'VERTAG'.
+      gv_key2 = 'BELNR'.
+      gv_key3 = 'EXT_UI'.
+      gv_key4 = 'ADATSOLL'.
+      CONCATENATE gv_key1 gv_key2 gv_key3 gv_key4 INTO gv_file_key SEPARATED BY '|'.
+
+      APPEND INITIAL LINE TO gt_ordtab ASSIGNING <field>.
+      <field>-name   = gv_key1.
+      <field>-astext = abap_true.
+
+      APPEND INITIAL LINE TO gt_ordtab ASSIGNING <field>.
+      <field>-name   = gv_key2.
+      <field>-astext = abap_true.
+
+      APPEND INITIAL LINE TO gt_ordtab ASSIGNING <field>.
+      <field>-name   = gv_key3.
+      <field>-astext = abap_true.
+
+      APPEND INITIAL LINE TO gt_ordtab ASSIGNING <field>.
+      <field>-name   = gv_key4.
+*      <field>-astext = abap_true.
+
+    WHEN rb_lett.
+
+      gv_file_struct = 'TY_METERREAD'.
+      gv_key1 = 'EXT_UI'.
+      gv_key2 =	'GERAET'.
+      gv_key3 =	'ADAT'.
+      gv_key4 =	'ZWNUMMER'.
+      CONCATENATE gv_key1 gv_key2 gv_key3 gv_key4 INTO gv_file_key SEPARATED BY '|'.
+
+      APPEND INITIAL LINE TO gt_ordtab ASSIGNING <field>.
+      <field>-name   = gv_key1.
+      <field>-astext = abap_true.
+
+      APPEND INITIAL LINE TO gt_ordtab ASSIGNING <field>.
+      <field>-name   = gv_key2.
+      <field>-astext = abap_true.
+
+      APPEND INITIAL LINE TO gt_ordtab ASSIGNING <field>.
+      <field>-name   = gv_key3.
+*      <field>-astext = abap_true.
+
+      APPEND INITIAL LINE TO gt_ordtab ASSIGNING <field>.
+      <field>-name   = gv_key4.
+*      <field>-astext = abap_true.
+
+    WHEN rb_oper.
+
+      gv_file_struct = 'TY_OPERAND'.
+      gv_key1 = 'ANLAGE'.
+      gv_key2 =	'OPERAND'.
+      gv_key3 =	'ABLFDNR'.
+      gv_key4 =	'AB'.
+      CONCATENATE gv_key1 gv_key2 gv_key3 gv_key4 INTO gv_file_key SEPARATED BY '|'.
+
+      APPEND INITIAL LINE TO gt_ordtab ASSIGNING <field>.
+      <field>-name   = gv_key1.
+      <field>-astext = abap_true.
+
+      APPEND INITIAL LINE TO gt_ordtab ASSIGNING <field>.
+      <field>-name   = gv_key2.
+      <field>-astext = abap_true.
+
+      APPEND INITIAL LINE TO gt_ordtab ASSIGNING <field>.
+      <field>-name   = gv_key3.
+*      <field>-astext = abap_true.
+
+      APPEND INITIAL LINE TO gt_ordtab ASSIGNING <field>.
+      <field>-name   = gv_key4.
+*      <field>-astext = abap_true.
+
+    WHEN OTHERS.
+
+      MESSAGE s646(db) WITH TEXT-e08 DISPLAY LIKE 'E'.
+      STOP.
+  ENDCASE.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form convert_data
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM convert_data .
+
+  DATA: lv_index      TYPE sy-index,
+        lv_tmp_string TYPE string.
+
+  FIELD-SYMBOLS: <component> LIKE LINE OF go_structdescr->components.
+
+  CREATE DATA gt_ecc_ext TYPE TABLE OF (gv_file_struct).
+  ASSIGN gt_ecc_ext->* TO <t_ecc>.
+
+  CREATE DATA gs_file_ext TYPE (gv_file_struct).
+  go_structdescr ?= cl_abap_typedescr=>describe_by_data_ref( p_data_ref = gs_file_ext ).
+
+  LOOP AT gt_file_scarti_ecc ASSIGNING FIELD-SYMBOL(<ecc>).
+
+    CLEAR: lv_tmp_string.
+    lv_tmp_string = <ecc>-dato.
+    APPEND INITIAL LINE TO <t_ecc> ASSIGNING FIELD-SYMBOL(<s_ecc>).
+
+    LOOP AT go_structdescr->components ASSIGNING <component>.
+
+      SPLIT lv_tmp_string AT ';'
+       INTO DATA(lv_sx)
+            DATA(lv_dx).
+
+      ASSIGN COMPONENT <component>-name OF STRUCTURE <s_ecc> TO FIELD-SYMBOL(<value>).
+
+      CASE <component>-type_kind.
+        WHEN cl_abap_typedescr=>typekind_float.
+*          REPLACE ALL OCCURRENCES OF '.' IN lv_sx WITH ''.
+          REPLACE ',' IN lv_sx WITH '.'.
+
+          CONDENSE lv_sx NO-GAPS.
+
+        WHEN 'P'. "Package number
+*          REPLACE ALL OCCURRENCES OF '.' IN lv_sx WITH ''.
+          REPLACE ',' IN lv_sx WITH '.'.
+
+          CONDENSE lv_sx NO-GAPS.
+
+        WHEN cl_abap_typedescr=>typekind_time.
+
+
+        WHEN OTHERS.
+          "Normal Data -> Nothing To Do
+
+      ENDCASE.
+
+      <value> = lv_sx.
+
+      lv_tmp_string = lv_dx.
+
+    ENDLOOP.
+
+  ENDLOOP.
+
+
+
+  CREATE DATA gt_s4_ext TYPE TABLE OF (gv_file_struct).
+  ASSIGN gt_s4_ext->* TO <t_s4>.
+
+  LOOP AT gt_file_scarti_s4 ASSIGNING FIELD-SYMBOL(<s4>).
+
+    CLEAR: lv_tmp_string.
+    lv_tmp_string = <s4>-dato.
+    APPEND INITIAL LINE TO <t_s4> ASSIGNING FIELD-SYMBOL(<s_s4>).
+
+    LOOP AT go_structdescr->components ASSIGNING <component>.
+
+      SPLIT lv_tmp_string AT ';'
+       INTO DATA(lv_sx1)
+            DATA(lv_dx1).
+
+      ASSIGN COMPONENT <component>-name OF STRUCTURE <s_s4> TO FIELD-SYMBOL(<value_s4>).
+
+      CASE <component>-type_kind.
+        WHEN cl_abap_typedescr=>typekind_float.
+          REPLACE ALL OCCURRENCES OF '.' IN lv_sx1 WITH ''.
+          REPLACE ',' IN lv_sx1 WITH '.'.
+
+          CONDENSE lv_sx1 NO-GAPS.
+
+        WHEN 'P'.
+*          REPLACE ALL OCCURRENCES OF '.' IN lv_sx1 WITH ''.
+          REPLACE ',' IN lv_sx1 WITH '.'.
+
+          CONDENSE lv_sx NO-GAPS.
+
+        WHEN cl_abap_typedescr=>typekind_time.
+          "TODO
+
+        WHEN OTHERS.
+          "Normal Data -> Nothing To Do
+
+      ENDCASE.
+
+      <value_s4> = lv_sx1.
+
+      lv_tmp_string = lv_dx1.
+
+    ENDLOOP.
+
+  ENDLOOP.
+
+  FREE gt_file_scarti_ecc[].
+  FREE gt_file_scarti_s4[].
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form get_scarti
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM get_scarti .
+
+  DATA: lv_subrc  TYPE char1,
+        lv_chiave TYPE string.
+
+  DATA: ls_ref TYPE REF TO data.
+
+  FIELD-SYMBOLS: <s_s4>   TYPE any,
+                 <scarto> LIKE LINE OF gt_file_scarti.
+
+  SORT <t_ecc> BY (gt_ordtab).
+  SORT <t_s4> BY (gt_ordtab).
+
+  CREATE DATA ls_ref TYPE (gv_file_struct).
+
+  REFRESH gt_file_scarti[].
+  LOOP AT <t_ecc> ASSIGNING FIELD-SYMBOL(<s_ecc>).
+
+    CLEAR lv_chiave.
+    UNASSIGN <s_s4>.
+    ASSIGN ls_ref->* TO <s_s4>.
+    CLEAR lv_subrc.
+    PERFORM manage_key_s4 USING    <s_ecc>
+                          CHANGING <s_s4>
+                                   lv_chiave
+                                   lv_subrc.
+
+    IF lv_subrc NE 0.
+
+      APPEND INITIAL LINE TO gt_file_scarti ASSIGNING <scarto>.
+      <scarto>-ref_chiave  = gv_file_key.
+      <scarto>-count       = space.
+      <scarto>-chiave_ecc  = lv_chiave.
+      <scarto>-descrizione = TEXT-i03.
+
+*      "Se voglio l'intero stringone csv
+*      "-------------------------------------------------
+*      PERFORM convert_sap_to_csv USING    <s_ecc>
+*                                          'ECC'
+*                                 CHANGING <scarto>.
+
+    ELSE.
+      "Controllo le differenze tra i due record
+      "-------------------------------------------------
+      PERFORM check_differnce USING    <s_ecc>
+                                       <s_s4>
+                                       'E'
+                                       lv_chiave.
+    ENDIF.
+
+  ENDLOOP.
+
+
+  LOOP AT <t_s4> ASSIGNING <s_s4>.
+
+    CLEAR lv_chiave.
+    UNASSIGN <s_ecc>.
+    ASSIGN ls_ref->* TO <s_ecc>.
+    CLEAR lv_subrc.
+    PERFORM manage_key_ecc USING    <s_s4>
+                           CHANGING <s_ecc>
+                                    lv_chiave
+                                    lv_subrc.
+
+    IF lv_subrc NE 0.
+
+      APPEND INITIAL LINE TO gt_file_scarti ASSIGNING <scarto>.
+      <scarto>-ref_chiave = gv_file_key.
+      <scarto>-chiave_s4  = lv_chiave.
+      <scarto>-descrizione = TEXT-i02.
+
+*      "Se voglio l'intero stringone csv
+*      "-------------------------------------------------
+*      PERFORM convert_sap_to_csv USING    <s_s4>
+*                                          'S4'
+*                                 CHANGING <scarto>.
+
+    ELSE.
+
+      "Controllo le differenze tra i due record
+      "-------------------------------------------------
+      PERFORM check_differnce USING    <s_s4>
+                                       <s_ecc>
+                                       'E'
+                                       lv_chiave.
+    ENDIF.
+
+  ENDLOOP.
+
+  FREE <t_ecc>[].
+  FREE <t_s4>[].
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form convert_sap_to_csv
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> <S_ECC>
+*&      <-- <SCARTO>_DATO
+*&---------------------------------------------------------------------*
+*FORM convert_sap_to_csv  USING    x_structure TYPE any
+*                                  x_type
+*                         CHANGING y_scarto    TYPE ty_scarto.
+*
+*  DATA: lv_index TYPE sy-index.
+*
+*  DO.
+*
+*    CLEAR lv_index.
+*    lv_index = sy-index.
+*    ASSIGN COMPONENT lv_index OF STRUCTURE x_structure TO FIELD-SYMBOL(<value>).
+*    IF sy-subrc NE 0.
+*      EXIT.
+*    ENDIF.
+*
+*
+*    IF y_scarto IS INITIAL.
+*      y_scarto-delta = <value>.
+*    ELSE.
+*      y_scarto-delta = y_scarto-delta && ';' && <value>.
+*    ENDIF.
+*
+*  ENDDO.
+*
+*ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form manage_key
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM manage_key_s4 USING    x_struct TYPE any
+                   CHANGING y_return TYPE any
+                            y_chiave
+                            y_esito.
+
+  DATA: ls_partner   TYPE ty_bp,
+        ls_contract  TYPE ty_contract,
+        ls_billdoc   TYPE ty_billdoc,
+        ls_operand   TYPE ty_operand,
+        ls_meterread TYPE ty_meterread.
+
+  FIELD-SYMBOLS: <s_s4> TYPE any.
+
+  CLEAR: ls_partner, ls_contract, ls_billdoc, ls_operand, ls_meterread.
+  CLEAR: y_chiave.
+
+  UNASSIGN <s_s4>.
+  CASE gv_file_struct.
+    WHEN 'TY_BP'.
+
+      MOVE-CORRESPONDING x_struct TO ls_partner.
+      y_chiave = ls_partner-partner.
+      READ TABLE <t_s4> ASSIGNING <s_s4>
+        WITH KEY (gv_key1) = ls_partner-partner
+                 BINARY SEARCH.
+
+    WHEN 'TY_CONTRACT'.
+
+      MOVE-CORRESPONDING x_struct TO ls_contract.
+      y_chiave = ls_contract-vertrag.
+      READ TABLE <t_s4> ASSIGNING <s_s4>
+        WITH KEY (gv_key1) = ls_contract-vertrag
+                 BINARY SEARCH.
+
+    WHEN 'TY_BILLDOC'.
+
+      MOVE-CORRESPONDING x_struct TO ls_billdoc.
+      CONCATENATE ls_billdoc-vertrag ls_billdoc-belnr ls_billdoc-ext_ui ls_billdoc-adatsoll INTO y_chiave SEPARATED BY ';'.
+
+      READ TABLE <t_s4> ASSIGNING <s_s4>
+        WITH KEY (gv_key1) = ls_billdoc-vertrag
+                 (gv_key2) = ls_billdoc-belnr
+                 (gv_key3) = ls_billdoc-ext_ui
+                 (gv_key4) = ls_billdoc-adatsoll
+                 BINARY SEARCH.
+
+    WHEN 'TY_OPERAND'.
+
+      MOVE-CORRESPONDING x_struct TO ls_operand.
+      CONCATENATE ls_operand-anlage ls_operand-operand ls_operand-ablfdnr ls_operand-ab INTO y_chiave SEPARATED BY ';'.
+
+      READ TABLE <t_s4> ASSIGNING <s_s4>
+        WITH KEY (gv_key1) = ls_operand-anlage
+                 (gv_key2) = ls_operand-operand
+                 (gv_key3) = ls_operand-ablfdnr
+                 (gv_key4) = ls_operand-ab
+                 BINARY SEARCH.
+
+    WHEN 'TY_METERREAD'.
+
+      MOVE-CORRESPONDING x_struct TO ls_meterread.
+      CONCATENATE ls_meterread-ext_ui ls_meterread-geraet ls_meterread-adat ls_meterread-zwnummer INTO y_chiave SEPARATED BY ';'.
+
+      READ TABLE <t_s4> ASSIGNING <s_s4>
+        WITH KEY (gv_key1) = ls_meterread-ext_ui
+                 (gv_key2) = ls_meterread-geraet
+                 (gv_key3) = ls_meterread-adat
+                 (gv_key4) = ls_meterread-zwnummer
+                 BINARY SEARCH.
+
+  ENDCASE.
+
+  IF <s_s4> IS NOT ASSIGNED.
+    y_esito = 4.
+  ELSE.
+    MOVE-CORRESPONDING <s_s4> TO y_return.
+    y_esito = 0.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form manage_key_ecc
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> <S_S4>
+*&      <-- <S_ECC>
+*&      <-- LV_SUBRC
+*&---------------------------------------------------------------------*
+FORM manage_key_ecc USING    x_struct TYPE any
+                    CHANGING y_return TYPE any
+                             y_chiave
+                             y_esito.
+
+  DATA: ls_partner   TYPE ty_bp,
+        ls_contract  TYPE ty_contract,
+        ls_billdoc   TYPE ty_billdoc,
+        ls_operand   TYPE ty_operand,
+        ls_meterread TYPE ty_meterread.
+
+  FIELD-SYMBOLS: <s_ecc> TYPE any.
+
+  CLEAR: ls_partner, ls_contract, ls_billdoc, ls_operand, ls_meterread.
+  CLEAR: y_chiave.
+
+  UNASSIGN <s_ecc>.
+  CASE gv_file_struct.
+    WHEN 'TY_BP'.
+
+      MOVE-CORRESPONDING x_struct TO ls_partner.
+      y_chiave = ls_partner-partner.
+      READ TABLE <t_ecc> ASSIGNING <s_ecc>
+        WITH KEY (gv_key1) = ls_partner-partner
+                 BINARY SEARCH.
+
+    WHEN 'TY_CONTRACT'.
+
+      MOVE-CORRESPONDING x_struct TO ls_contract.
+      y_chiave = ls_contract-vertrag.
+      READ TABLE <t_ecc> ASSIGNING <s_ecc>
+        WITH KEY (gv_key1) = ls_contract-vertrag
+                 BINARY SEARCH.
+
+    WHEN 'TY_BILLDOC'.
+
+      MOVE-CORRESPONDING x_struct TO ls_billdoc.
+      CONCATENATE ls_billdoc-vertrag ls_billdoc-belnr ls_billdoc-ext_ui ls_billdoc-adatsoll INTO y_chiave SEPARATED BY ';'.
+
+      READ TABLE <t_ecc> ASSIGNING <s_ecc>
+        WITH KEY (gv_key1) = ls_billdoc-vertrag
+                 (gv_key2) = ls_billdoc-belnr
+                 (gv_key3) = ls_billdoc-ext_ui
+                 (gv_key4) = ls_billdoc-adatsoll
+                 BINARY SEARCH.
+
+    WHEN 'TY_OPERAND'.
+
+      MOVE-CORRESPONDING x_struct TO ls_operand.
+      CONCATENATE ls_operand-anlage ls_operand-operand ls_operand-ablfdnr ls_operand-ab INTO y_chiave SEPARATED BY ';'.
+
+      READ TABLE <t_ecc> ASSIGNING <s_ecc>
+        WITH KEY (gv_key1) = ls_operand-anlage
+                 (gv_key2) = ls_operand-operand
+                 (gv_key3) = ls_operand-ablfdnr
+                 (gv_key4) = ls_operand-ab
+                 BINARY SEARCH.
+
+    WHEN 'TY_METERREAD'.
+
+      MOVE-CORRESPONDING x_struct TO ls_meterread.
+      CONCATENATE ls_meterread-ext_ui ls_meterread-geraet ls_meterread-adat ls_meterread-zwnummer INTO y_chiave SEPARATED BY ';'.
+
+      READ TABLE <t_ecc> ASSIGNING <s_ecc>
+        WITH KEY (gv_key1) = ls_meterread-ext_ui
+                 (gv_key2) = ls_meterread-geraet
+                 (gv_key3) = ls_meterread-adat
+                 (gv_key4) = ls_meterread-zwnummer
+                 BINARY SEARCH.
+
+  ENDCASE.
+
+  IF <s_ecc> IS NOT ASSIGNED.
+    y_esito = 4.
+  ELSE.
+    MOVE-CORRESPONDING <s_ecc> TO y_return.
+    y_esito = 0.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form check_differnce
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> <S_ECC>
+*&      <-- <SCARTO>
+*&---------------------------------------------------------------------*
+FORM check_differnce  USING    xs_principal TYPE any
+                               xs_secondary TYPE any
+                               x_type
+                               xv_chiave.
+  "CHANGING y_scarto     TYPE ty_scarto. "Tado da togliere
+
+  DATA: lv_index      TYPE sy-index,
+        lv_scarto     TYPE string,
+        lv_ref_scarto TYPE string,
+        lv_count      TYPE string,
+        lv_descr      TYPE string.
+
+  DATA: lv_value1 TYPE string,
+        lv_value2 TYPE string.
+
+*         ref_chiave  TYPE string,
+*         chiave_ecc  TYPE string,
+*         chiave_s4   TYPE string,
+*         count       TYPE string,
+*         ref_delta   TYPE string,
+*         descrizione TYPE string,
+
+  CLEAR: lv_scarto, lv_descr, lv_ref_scarto, lv_count.
+  LOOP AT go_structdescr->components ASSIGNING FIELD-SYMBOL(<component>).
+
+    ASSIGN COMPONENT <component>-name OF STRUCTURE xs_principal TO FIELD-SYMBOL(<value_principal>).
+    ASSIGN COMPONENT <component>-name OF STRUCTURE xs_secondary TO FIELD-SYMBOL(<value_secondary>).
+
+    IF <value_principal> NE <value_secondary>.
+
+      lv_count = lv_count + 1.
+
+      APPEND INITIAL LINE TO gt_file_scarti ASSIGNING FIELD-SYMBOL(<scarto>).
+      <scarto>-ref_chiave  = gv_file_key.
+      <scarto>-chiave_ecc  = xv_chiave.
+      <scarto>-chiave_s4   = xv_chiave.
+      <scarto>-count       = lv_count.
+      <scarto>-ref_delta   = <component>-name.
+*      IF lv_scarto IS INITIAL.
+*        lv_scarto = <value_principal>.
+
+*      ELSE.
+*        lv_scarto = lv_scarto && ';' && <value_principal>.
+*        lv_ref_scarto = lv_ref_scarto && '|' && <component>-name.
+*      ENDIF.
+
+*      IF lv_descr IS INITIAL.
+      CLEAR: lv_value1,
+             lv_value2 .
+
+      lv_value1 = <value_principal>.
+      lv_value2 = <value_secondary>.
+
+      IF x_type EQ 'E'.
+        CONCATENATE  'ECC:' lv_value1 'S4:' lv_value2 INTO <scarto>-descrizione SEPARATED BY space.
+      ELSE.
+        CONCATENATE  'S4:' lv_value1 'ECC:' lv_value2 INTO <scarto>-descrizione SEPARATED BY space.
+      ENDIF.
+
+*      ELSE.
+*
+*        IF x_type EQ 'E'.
+*          CONCATENATE lv_descr '-' 'ECC:' <value_principal> 'S4:' <value_secondary> INTO lv_descr SEPARATED BY space.
+*        ELSE.
+*          CONCATENATE lv_descr '-' 'S4:' <value_principal> 'ECC:' <value_secondary> INTO lv_descr SEPARATED BY space.
+*        ENDIF.
+*
+*      ENDIF.
+
+    ENDIF.
+  ENDLOOP.
+
+*  y_scarto-delta       = lv_scarto.
+*  y_scarto-ref_delta   = lv_ref_scarto.
+*  y_scarto-descrizione = lv_descr.
+
+ENDFORM.
