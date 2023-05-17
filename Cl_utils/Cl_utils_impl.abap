@@ -450,10 +450,18 @@ ENDFORM.
     data: grt_columns type ref to cl_salv_columns.
     grt_columns->set_column_position( columnname = 'TVERSN'
                                       position   = 1 ).
+                                      
+    DATA: lv_txt_m  TYPE scrtext_m,
+          lv_txt_s  TYPE scrtext_s.
+
+    lv_txt_m = 'ETICHETTA_MEDIA'.
+    lv_txt_s = 'ETICHETTA_PICCOLA'.
 
     TRY.
         lr_salv_columns->get_column( 'MANDT' )->set_visible( if_salv_c_bool_sap=>false  ). "Nascondere campi
         lr_salv_columns->get_column( 'NOME_CAMPO' )->set_long_text( 'NEW_NAME' ). "Cambio label
+        lr_salv_columns->get_column( 'NOME_CAMPO' )->set_medium_text( lv_txt_m ). "Setta testo medie dimensioni
+        lr_salv_columns->get_column( 'NOME_CAMPO' )->set_short_text( lv_txt_s ). "Setta testo piccole dimensioni
       CATCH cx_salv_not_found.
     ENDTRY.
 
