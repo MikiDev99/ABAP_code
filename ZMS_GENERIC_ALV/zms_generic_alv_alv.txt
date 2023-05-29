@@ -1,0 +1,124 @@
+*&---------------------------------------------------------------------*
+*& Include          ZMS_GENERIC_ALV_ALV
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*& Module STATUS_0100 OUTPUT
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+MODULE status_0100 OUTPUT.
+  SET PF-STATUS 'STATO_GUI'.
+  SET TITLEBAR 'TITLE001'.
+
+  PERFORM create_fieldcat.
+  PERFORM create_alv.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0100  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command_0100 INPUT.
+
+  CASE sy-ucomm.
+    WHEN c_back_ucomm.
+      LEAVE TO SCREEN 0.
+    WHEN c_exit_ucomm.
+      LEAVE PROGRAM.
+    WHEN c_save_ucomm.
+*      CALL METHOD grid->refresh_table_display.
+*      PERFORM save_data.
+    WHEN OTHERS.
+  ENDCASE.
+
+ENDMODULE.
+
+
+*&---------------------------------------------------------------------*
+*& Module STATUS_0200 OUTPUT
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+MODULE status_0200 OUTPUT.
+  SET PF-STATUS 'STATO_GUI2'.
+  SET TITLEBAR 'TITLE002'.
+
+  PERFORM create_fieldcat_fatt.
+  PERFORM create_alv_fatt.
+ENDMODULE.
+
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0200  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command_0200 INPUT.
+
+  CASE sy-ucomm.
+    WHEN c_back_ucomm.
+      LEAVE TO SCREEN 0.
+    WHEN c_exit_ucomm.
+      LEAVE PROGRAM.
+    WHEN c_save_ucomm.
+*      CALL METHOD grid->refresh_table_display.
+*      PERFORM save_data.
+    WHEN OTHERS.
+  ENDCASE.
+
+ENDMODULE.
+
+
+
+*&---------------------------------------------------------------------*
+*& Include          ZACC_MS_ESTR_DOC_CLS
+*&---------------------------------------------------------------------*
+
+CLASS cl_event_handler DEFINITION.
+  PUBLIC SECTION.
+    METHODS: user_command         FOR EVENT after_user_command OF cl_gui_alv_grid IMPORTING e_ucomm.
+    METHODS: toolbar              FOR EVENT toolbar            OF cl_gui_alv_grid IMPORTING e_object e_interactive.
+    METHODS: handle_hotspot_click FOR EVENT hotspot_click      OF cl_gui_alv_grid IMPORTING e_row_id e_column_id es_row_no.
+ENDCLASS.
+
+CLASS cl_event_handler IMPLEMENTATION.
+  METHOD toolbar.
+    DATA : mt_toolbar TYPE stb_button.
+
+    CLEAR mt_toolbar.
+    mt_toolbar-butn_type = '3'.   "separator
+    APPEND mt_toolbar TO e_object->mt_toolbar.
+    CLEAR mt_toolbar.
+    mt_toolbar-butn_type = '0'.   "normal Button
+    mt_toolbar-function  = 'CL_REF'.   "fcode
+    mt_toolbar-icon      = '@3W@'.
+    mt_toolbar-quickinfo = 'MOSTRA FATTURE'.
+    mt_toolbar-text      = 'Mostra fatture'.
+    APPEND mt_toolbar TO e_object->mt_toolbar.
+  ENDMETHOD.                    "TOOLBAR
+
+  METHOD user_command.
+    IF e_ucomm = 'CL_REF'.
+*      MESSAGE i000(db) WITH 'Hello World'.
+      PERFORM view_fatt.
+
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD handle_hotspot_click.
+
+    READ TABLE gt_output ASSIGNING FIELD-SYMBOL(<output>) INDEX e_row_id-index.
+    IF sy-subrc = 0.
+      CASE e_column_id.
+          WHEN 'LIFNR'.
+          SET PARAMETER ID 'LIF' FIELD <output>-lifnr.
+          CALL TRANSACTION 'XK03' AND SKIP FIRST SCREEN.
+*        	WHEN .
+          WHEN OTHERS.
+      ENDCASE.
+
+    ENDIF.
+  ENDMETHOD. "handle_hotspot_click
+  "USER_COMMAND
+ENDCLASS.
+
+DATA: handler TYPE REF TO cl_event_handler.

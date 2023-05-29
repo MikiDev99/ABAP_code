@@ -1,0 +1,12 @@
+*&---------------------------------------------------------------------*
+*& Include          ZMS_GENERIC_ALV_SCR
+*&---------------------------------------------------------------------*
+TABLES: lfa1.
+
+SELECTION-SCREEN: BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-001.
+
+SELECTION-SCREEN SKIP.
+
+SELECT-OPTIONS: s_forn FOR lfa1-lifnr.
+
+SELECTION-SCREEN: END OF BLOCK b1.

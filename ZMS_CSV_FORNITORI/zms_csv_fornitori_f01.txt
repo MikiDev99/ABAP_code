@@ -1,0 +1,610 @@
+*&---------------------------------------------------------------------*
+*& Include          ZMS_CSV_FORNITORI_F01
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*& Form SELECT_DIR
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM select_dir .
+
+  CASE 'X'.
+
+    WHEN rb_lcl.
+
+      CALL METHOD cl_gui_frontend_services=>directory_browse
+        EXPORTING
+          window_title    = c_title_lcl
+          initial_folder  = p_dir
+        CHANGING
+          selected_folder = p_dir.
+
+    WHEN rb_srv.
+
+      "Selezionre cartella da server
+      CALL FUNCTION '/SAPDMC/LSM_F4_SERVER_FILE'
+        EXPORTING
+          directory        = p_dir
+          filemask         = '?'
+        IMPORTING
+          serverfile       = p_dir
+        EXCEPTIONS
+          canceled_by_user = 1
+          OTHERS           = 2.
+      IF sy-subrc <> 0.
+
+      ENDIF.
+
+    WHEN OTHERS.
+  ENDCASE.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form EXTRACT_DATA
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM extract_data .
+
+  DATA: lt_lfa1_pkg  TYPE TABLE OF ty_lfa1,
+        lt_adr_pkg   TYPE TABLE OF ty_adr,
+        lt_tiban_pkg TYPE TABLE OF ty_tiban.
+
+
+  DATA: lv_cursor    TYPE cursor.
+
+  CLEAR lv_cursor.
+  OPEN CURSOR @lv_cursor FOR
+       SELECT lfa1~lifnr,
+              lfa1~land1,
+              lfa1~name1,
+              lfa1~name2,
+              lfa1~name3,
+              lfa1~name4,
+              lfa1~ort01,
+              lfa1~ort02,
+              lfa1~pstlz,
+              lfa1~regio,
+              lfa1~stkzn,
+              lfa1~adrnr
+         FROM lfa1.
+  DO.
+
+    REFRESH lt_lfa1_pkg.
+    FETCH NEXT CURSOR @lv_cursor INTO TABLE @lt_lfa1_pkg PACKAGE SIZE 5000.
+    IF sy-subrc <> 0.
+      EXIT.
+    ENDIF.
+
+    "Estraggo informaziono aggiuntive per ciascun fornitore
+    "-------------------------------------------------
+    PERFORM extract_add_info USING    lt_lfa1_pkg
+                             CHANGING lt_adr_pkg
+                                      lt_tiban_pkg.
+
+    "Calcolo spese per ogni fornitore
+    "-------------------------------------------------
+    PERFORM calc_spese_fornitore CHANGING lt_lfa1_pkg.
+
+
+    "Valorizzo la tabella di output
+    "-------------------------------------------------
+    PERFORM create_output USING lt_lfa1_pkg
+                                lt_adr_pkg
+                                lt_tiban_pkg.
+
+
+  ENDDO.
+
+  CLOSE CURSOR lv_cursor.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form CALC_SPESE_FORNITORE
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      <-- LT_LFA1_PKG
+*&---------------------------------------------------------------------*
+FORM calc_spese_fornitore  CHANGING yt_lfa1_pkg TYPE tt_lfa1.
+
+  DATA: lt_ekko_pkg TYPE TABLE OF ty_ekko.
+*        lt_ekpo     TYPE TABLE OF ty_ekpo.
+
+  DATA: lv_cursor TYPE cursor.
+  "-------------------------------------------------
+
+
+  CLEAR lv_cursor.
+  OPEN CURSOR lv_cursor FOR
+     SELECT ekko~ebeln
+            ekko~bedat
+            ekko~lifnr
+            ekpo~ebelp
+            ekpo~netwr
+       FROM ekko
+       INNER JOIN ekpo AS ekpo ON ekpo~ebeln EQ ekko~ebeln
+       FOR ALL ENTRIES IN yt_lfa1_pkg
+       WHERE ekko~lifnr EQ yt_lfa1_pkg-lifnr.
+  DO.
+
+    REFRESH lt_ekko_pkg.
+    FETCH NEXT CURSOR lv_cursor INTO TABLE lt_ekko_pkg PACKAGE SIZE 5000.
+    IF sy-subrc <> 0.
+      EXIT.
+    ENDIF.
+
+*    REFRESH lt_ekpo.
+*    SELECT ekpo~ebeln,
+*           ekpo~ebelp,
+*           ekpo~netwr
+*      from ekpo
+*      FOR ALL ENTRIES IN @lt_ekko_pkg
+*      WHERE ebeln EQ @lt_ekko_pkg-ebeln
+*      INTO TABLE @lt_ekpo.
+
+    SORT lt_ekko_pkg BY lifnr ebeln ebelp bedat.
+    LOOP AT yt_lfa1_pkg ASSIGNING FIELD-SYMBOL(<lfa1>).
+
+      READ TABLE lt_ekko_pkg TRANSPORTING NO FIELDS BINARY SEARCH
+        WITH KEY lifnr = <lfa1>-lifnr.
+      CHECK sy-subrc EQ 0.
+
+      LOOP AT lt_ekko_pkg ASSIGNING FIELD-SYMBOL(<ekko>) FROM sy-tabix.
+
+        IF <lfa1>-lifnr NE <ekko>-lifnr.
+          EXIT.
+        ENDIF.
+*
+*        READ TABLE lt_ekpo TRANSPORTING NO FIELDS BINARY SEARCH
+*          WITH KEY ebeln = <ekko>-ebeln.
+*        CHECK sy-subrc EQ 0.
+*
+*        LOOP AT lt_ekpo ASSIGNING FIELD-SYMBOL(<ekpo>).
+
+*          IF <ekpo>-ebeln NE <ekko>-ebeln.
+*            EXIT.
+*          ENDIF.
+
+        <lfa1>-data = <ekko>-bedat.
+        ADD <ekko>-netwr TO <lfa1>-tot.
+
+*        ENDLOOP.
+
+      ENDLOOP.
+
+    ENDLOOP.
+
+  ENDDO.
+  CLOSE CURSOR lv_cursor.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form CREATE_OUTPUT
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> LT_LFA1_PKG
+*&      --> LT_TIBAN_PKG
+*&---------------------------------------------------------------------*
+FORM create_output  USING xt_lfa1_pkg  TYPE tt_lfa1
+                          xt_adr_pkg   TYPE tt_adr
+                          xt_tiban_pkg TYPE tt_tiban.
+
+  DATA: lv_addr_tmp TYPE string.
+
+  SORT xt_lfa1_pkg  BY lifnr adrnr data.
+  SORT xt_adr_pkg   BY addrnumber.
+  SORT xt_tiban_pkg BY lifnr valid_from DESCENDING.
+
+*  IF xt_tiban_pkg IS NOT INITIAL.
+
+  LOOP AT xt_lfa1_pkg ASSIGNING FIELD-SYMBOL(<lfa1>).
+
+    APPEND INITIAL LINE TO gt_output ASSIGNING FIELD-SYMBOL(<output>).
+    <output>-lifnr      = <lfa1>-lifnr.
+    <output>-land1      = <lfa1>-land1.
+    <output>-name1      = <lfa1>-name1.
+    <output>-name2      = <lfa1>-name2.
+    <output>-name3      = <lfa1>-name3.
+    <output>-name4      = <lfa1>-name4.
+    <output>-ort01      = <lfa1>-ort01.
+    <output>-ort02      = <lfa1>-ort02.
+    <output>-pstlz      = <lfa1>-pstlz.
+    <output>-regio      = <lfa1>-regio.
+    <output>-stkzn      = <lfa1>-stkzn.
+    <output>-tot_spese  = <lfa1>-tot.
+    <output>-data       = <lfa1>-data. "Ci sara la data dell' ultima fattura per ciascun fornitore
+
+    READ TABLE xt_adr_pkg TRANSPORTING NO FIELDS BINARY SEARCH
+      WITH KEY addrnumber = <lfa1>-adrnr.
+    CHECK sy-subrc EQ 0.
+
+    CLEAR lv_addr_tmp.
+
+    LOOP AT xt_adr_pkg ASSIGNING FIELD-SYMBOL(<adr>) FROM sy-tabix.
+
+      IF <adr>-addrnumber NE <lfa1>-adrnr.
+        EXIT.
+      ENDIF.
+
+      IF lv_addr_tmp IS INITIAL.
+        lv_addr_tmp = <adr>-smtp_addr.
+      ELSE.
+        lv_addr_tmp = lv_addr_tmp && '|' && <adr>-smtp_addr.
+      ENDIF.
+
+    ENDLOOP.
+
+    <output>-smtp_addr = lv_addr_tmp.
+
+*    IF cb_iban EQ 'X'.
+
+    READ TABLE xt_tiban_pkg ASSIGNING FIELD-SYMBOL(<iban>)
+      BINARY SEARCH WITH KEY lifnr = <lfa1>-lifnr.
+    IF sy-subrc EQ 0.
+
+      <output>-iban = <iban>-iban.
+
+    ENDIF.
+
+  ENDLOOP.
+
+*  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form CREATE_CSV
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM create_csv .
+
+  DATA: lv_file     LIKE rlgrap-filename VALUE '',
+        lv_tab_name TYPE tabname,
+        lv_header   TYPE string.
+
+  DATA: lt_output_string TYPE TABLE OF string.
+
+  lv_file = p_dir && c_default_fname.
+
+  lv_tab_name = c_tab_name.
+  PERFORM get_header_from_ddic USING    lv_tab_name
+                               CHANGING lv_header.
+
+  "Appendo l'header alla tabella di output
+  "-------------------------------------------------
+  APPEND lv_header TO lt_output_string.
+
+  PERFORM create_text_for_output  USING    lv_tab_name
+                                  CHANGING lt_output_string.
+
+  IF lines( lt_output_string ) LE 1.
+    MESSAGE s646(db) WITH TEXT-e03 DISPLAY LIKE 'E'.
+    STOP.
+  ENDIF.
+
+  CASE 'X'.
+    WHEN rb_lcl.
+
+      PERFORM store_csv_lcl USING    lt_output_string
+                            CHANGING lv_file.
+
+    WHEN rb_srv.
+
+      PERFORM store_csv_srv USING    lt_output_string
+                            CHANGING lv_file.
+
+    WHEN OTHERS.
+  ENDCASE.
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form STORE_CSV
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM store_csv_srv USING    xt_output_string TYPE tt_string
+                   CHANGING yv_file.
+
+  OPEN DATASET yv_file FOR OUTPUT IN TEXT MODE ENCODING DEFAULT IGNORING CONVERSION ERRORS.
+
+  IF sy-subrc EQ 0.
+
+    LOOP AT xt_output_string ASSIGNING FIELD-SYMBOL(<output_string>).
+      TRANSFER <output_string> TO yv_file.
+    ENDLOOP.
+
+    CLOSE DATASET yv_file.
+
+  ELSE.
+
+    CLOSE DATASET yv_file.
+    MESSAGE s646(db) WITH TEXT-e02 DISPLAY LIKE 'E'.
+
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form STORE_LCL
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM store_csv_lcl USING    xt_output_string TYPE tt_string
+                   CHANGING yv_file.
+
+  DATA: lv_filename TYPE string.
+
+  lv_filename = yv_file.
+
+  CALL FUNCTION 'GUI_DOWNLOAD'
+    EXPORTING
+      filename                = lv_filename
+*     filetype                =
+*    IMPORTING
+*     filelength              =
+    TABLES
+      data_tab                = xt_output_string
+    EXCEPTIONS
+      file_write_error        = 1
+      no_batch                = 2
+      gui_refuse_filetransfer = 3
+      invalid_type            = 4
+      no_authority            = 5
+      unknown_error           = 6
+      header_not_allowed      = 7
+      separator_not_allowed   = 8
+      filesize_not_allowed    = 9
+      header_too_long         = 10
+      dp_error_create         = 11
+      dp_error_send           = 12
+      dp_error_write          = 13
+      unknown_dp_error        = 14
+      access_denied           = 15
+      dp_out_of_memory        = 16
+      disk_full               = 17
+      dp_timeout              = 18
+      file_not_found          = 19
+      dataprovider_exception  = 20
+      control_flush_error     = 21
+      OTHERS                  = 22.
+
+  IF sy-subrc <> 0.
+    MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+            WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form GET_HEADER_FROM_DDIC
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> LV_TAB_NAME
+*&      <-- LV_HEADER
+*&---------------------------------------------------------------------*
+FORM get_header_from_ddic  USING    xv_tab_name
+                           CHANGING yv_header.
+
+  DATA: lv_details       TYPE abap_compdescr_tab,
+        lv_ref_table_des TYPE REF TO cl_abap_structdescr,
+        lt_type          TYPE TABLE OF dfies.
+
+  "Prendo i nomi dei campi della tabella
+  "-------------------------------------------------
+  lv_ref_table_des ?=
+      cl_abap_typedescr=>describe_by_name( xv_tab_name ).
+  lv_details[] = lv_ref_table_des->components[].
+
+  CHECK lv_details IS NOT INITIAL.
+
+  "Prendo le etichette dei campi della tabella
+  "-------------------------------------------------
+  CALL FUNCTION 'DDIF_FIELDINFO_GET'
+    EXPORTING
+      tabname        = xv_tab_name
+      langu          = sy-langu
+    TABLES
+      dfies_tab      = lt_type
+    EXCEPTIONS
+      not_found      = 1
+      internal_error = 2
+      OTHERS         = 3.
+  IF sy-subrc <> 0.
+    "Implement suitable error handling here
+  ENDIF.
+
+  "Costruisco l'intestazione
+  "-------------------------------------------------
+  LOOP AT lt_type ASSIGNING FIELD-SYMBOL(<fieldname>).
+
+    IF yv_header IS INITIAL.
+      yv_header = <fieldname>-fieldtext.
+    ELSE.
+      yv_header = yv_header &&  ';' && <fieldname>-fieldtext.
+    ENDIF.
+
+  ENDLOOP.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form CREATE_TEXT_FOR_OUTPUT
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> LV_HEADER
+*&      <-- LV_TEXT
+*&---------------------------------------------------------------------*
+FORM create_text_for_output  USING    xv_tab_name
+                             CHANGING yt_output_string TYPE tt_string.
+
+  DATA: lv_details       TYPE abap_compdescr_tab,
+        lv_daticsv       TYPE string,
+        lv_ref_table_des TYPE REF TO cl_abap_structdescr,
+        lt_type          TYPE TABLE OF dfies,
+        lv_data          TYPE string,
+        lv_importo       TYPE string,
+        lv_segno         TYPE char1.
+
+
+
+  IF gt_output IS NOT INITIAL.
+
+    "Prendo i nomi dei campi della tabella
+    "-------------------------------------------------
+    lv_ref_table_des ?=
+        cl_abap_typedescr=>describe_by_name( xv_tab_name ).
+    lv_details[] = lv_ref_table_des->components[].
+
+    LOOP AT gt_output ASSIGNING FIELD-SYMBOL(<s_output>).
+
+      CLEAR lv_daticsv.
+
+      LOOP AT lv_details ASSIGNING FIELD-SYMBOL(<detail>).
+
+        ASSIGN COMPONENT <detail>-name OF STRUCTURE <s_output> TO FIELD-SYMBOL(<output>).
+
+        "TODO distinzione tra campi data, campi numerici, campi testo
+        " - date da convertire da formato sap YYYYMMDD a DD/MM/YYYYY
+        " - numeri da formato sap 1234.20- a formato excel - 1234,20
+
+        CASE <detail>-type_kind.
+          WHEN cl_abap_typedescr=>typekind_float.
+            IF <detail>-name EQ 'TOT_SPESE'.
+
+              CLEAR lv_importo.
+              CLEAR lv_segno.
+
+              lv_importo = <output>.
+              REPLACE ALL OCCURRENCES OF '.' IN lv_importo WITH ','.
+              SPLIT lv_importo AT '-' INTO lv_importo lv_segno.
+
+*              CHECK lv_segno IS NOT INITIAL.
+              lv_daticsv = lv_daticsv && ';' && lv_segno && lv_importo.
+
+            ENDIF.
+          WHEN 'D'.
+
+            IF <detail>-name EQ 'DATA'.
+
+              lv_daticsv = lv_daticsv && ';' && <output>+6(2) && '/' && <output>+4(2) && '/' && <output>(4).
+*              WRITE <output> to lv_daticsv DD/MM/YYYY.
+
+            ENDIF.
+
+          WHEN OTHERS.
+            IF lv_daticsv IS INITIAL.
+              lv_daticsv = <output>.
+            ELSE.
+              lv_daticsv = lv_daticsv && ';' && <output>.
+            ENDIF.
+        ENDCASE.
+
+      ENDLOOP.
+
+      APPEND lv_daticsv TO yt_output_string.
+
+    ENDLOOP.
+
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form CHECK_INPUT
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM check_input .
+
+  IF p_dir IS INITIAL.
+    MESSAGE s646(db) WITH TEXT-e00 TEXT-t01 DISPLAY LIKE 'E'.
+    STOP.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form EXTRACT_ADD_INFO
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> LT_LFA1_PKG
+*&---------------------------------------------------------------------*
+FORM extract_add_info  USING    xt_lfa1_pkg  TYPE tt_lfa1
+                       CHANGING yt_adr_pkg   TYPE tt_adr
+                                yt_tiban_pkg TYPE tt_tiban.
+
+  REFRESH yt_adr_pkg.
+  SELECT adr6~smtp_addr,
+         adr6~addrnumber
+    FROM adrc
+    LEFT OUTER JOIN adr6 AS adr6 ON adr6~addrnumber EQ adrc~addrnumber
+    INTO TABLE @yt_adr_pkg
+    FOR ALL ENTRIES IN @xt_lfa1_pkg
+    WHERE adrc~addrnumber EQ @xt_lfa1_pkg-adrnr.
+
+*  CHECK sy-subrc EQ 0.
+
+  REFRESH yt_tiban_pkg.
+  SELECT lfbk~lifnr,
+         lfbk~banks,
+         lfbk~bankl,
+         lfbk~bankn,
+         tiban~iban,
+         tiban~valid_from
+  FROM lfbk
+  INNER JOIN tiban AS tiban  ON tiban~banks EQ lfbk~banks
+                            AND lfbk~bankl  EQ tiban~bankl
+                            AND lfbk~bankn  EQ tiban~bankn
+                            AND lfbk~bkont  EQ tiban~bkont
+
+  INTO TABLE @yt_tiban_pkg
+  FOR ALL ENTRIES IN @xt_lfa1_pkg
+  WHERE lfbk~lifnr EQ @xt_lfa1_pkg-lifnr.
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form INIT_DIR
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM init_dir .
+
+  IF rb_lcl EQ 'X'.
+
+    CALL METHOD cl_gui_frontend_services=>get_desktop_directory
+      CHANGING
+        desktop_directory = p_dir
+      EXCEPTIONS
+        cntl_error        = 1.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+    CALL METHOD cl_gui_cfw=>update_view.
+
+  ENDIF.
+
+ENDFORM.

@@ -1,0 +1,23 @@
+*&---------------------------------------------------------------------*
+*& Report ZMS_GENERIC_ALV
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zms_generic_alv.
+
+INCLUDE zms_generic_alv_top.
+INCLUDE zms_generic_alv_scr.
+INCLUDE zms_generic_alv_alv.
+INCLUDE zms_generic_alv_f01.
+
+INITIALIZATION.
+*  PERFORM init_alv.
+
+START-OF-SELECTION.
+  "Estrazione dati dei fornitori
+  "-------------------------------------------------
+  PERFORM extract_data_fornitori.
+
+
+END-OF-SELECTION.
+  CALL SCREEN 0100.

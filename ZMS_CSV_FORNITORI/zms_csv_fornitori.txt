@@ -1,0 +1,44 @@
+*&---------------------------------------------------------------------*
+*& Report ZMS_CSV_FORNITORI
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zms_csv_fornitori.
+
+INCLUDE zms_csv_fornitori_top.
+INCLUDE zms_csv_fornitori_scr.
+INCLUDE zms_csv_fornitori_f01.
+"-------------------------------------------------
+
+"TODO
+" - il path in input deve essere case sensitive                       FATTO
+" - Controllo del subrc all' open dataset                             FATTO
+" - get desktop directory per matchcode locale                        FATTO
+" - spostare il check sul path in input dopo lo start of selection    FATTO
+" - cambiare l estrazione della adrc adr6 togliendola dalla join      FATTO
+" - attenzione alla numerosità in output : 1 record per fornitore     FATTO
+
+
+INITIALIZATION.
+  "Inizializzo la directory di partenza
+  PERFORM init_dir.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_dir.
+  "Scelta della diectory locale o setver
+  PERFORM select_dir.
+
+
+START-OF-SELECTION.
+  "Controllo che il parametro sia avvalorato
+  "-------------------------------------------------
+  PERFORM check_input.
+
+  "Estrazione dati fornitore
+  "-------------------------------------------------
+  PERFORM extract_data.
+
+
+END-OF-SELECTION.
+  "Creazione del file csv nella directory specificata
+  "-------------------------------------------------
+  PERFORM create_csv.

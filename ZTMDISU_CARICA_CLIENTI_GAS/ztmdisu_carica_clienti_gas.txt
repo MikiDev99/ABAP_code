@@ -1,0 +1,44 @@
+*&---------------------------------------------------------------------*
+*& Report  ZTMDISU_CARICA_CLIENTI_GAS
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+
+REPORT  ZTMDISU_CARICA_CLIENTI_GAS.
+
+INCLUDE ZTMDISU_CARICA_CLIENTI_GAS_TOP.
+INCLUDE ZTMDISU_CARICA_CLIENTI_GAS_SCR.
+INCLUDE ZTMDISU_CARICA_CLIENTI_GAS_ALV.
+INCLUDE ZTMDISU_CARICA_CLIENTI_GAS_F01.
+"-------------------------------------------------
+
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_dir.
+  PERFORM help_file CHANGING p_dir.
+
+START-OF-SELECTION.
+  "Controllo che il path in input non sia vuoto
+  "-------------------------------------------------
+  PERFORM check_input.
+
+  "Leggo i dati da file excel da inserire in tabella di stringhe
+  "-------------------------------------------------
+  PERFORM get_excel_file USING p_dir.
+
+  "Leggo e converto i valori
+  "-------------------------------------------------
+  PERFORM convert_data.
+
+  "Rendo disponibili i dati in output
+  "-------------------------------------------------
+  PERFORM create_output.
+
+  "Faccio la modifica a DB
+  "-------------------------------------------------
+  PERFORM update_data.
+
+END-OF-SELECTION.
+  CHECK gt_output[] IS NOT INITIAL.
+  CALL SCREEN 0100.

@@ -1,0 +1,16 @@
+*&---------------------------------------------------------------------*
+*&  Include           ZTMDISU_CARICA_CLIENTI_GAS_SCR
+*&---------------------------------------------------------------------*
+SELECTION-SCREEN: BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-001.
+
+SELECTION-SCREEN SKIP.
+
+PARAMETERS: p_dir TYPE string.
+
+SELECTION-SCREEN SKIP.
+
+PARAMETERS: cb_head  AS CHECKBOX DEFAULT ' '.
+
+SELECTION-SCREEN: END OF BLOCK b1.
+SELECTION-SCREEN SKIP.
+PARAMETERS: cb_simul AS CHECKBOX DEFAULT 'X'.

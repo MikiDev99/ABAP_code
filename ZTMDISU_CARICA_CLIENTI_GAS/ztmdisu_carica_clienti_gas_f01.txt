@@ -1,0 +1,303 @@
+*&---------------------------------------------------------------------*
+*&  Include           ZTMDISU_CARICA_CLIENTI_GAS_F01
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Form  CHECK_INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM CHECK_INPUT .
+
+  IF p_dir IS INITIAL.
+    MESSAGE s646(db) WITH text-e00 text-p01 DISPLAY LIKE 'E'.
+    STOP.
+  ENDIF.
+
+ENDFORM.                    " CHECK_INPUT
+*&---------------------------------------------------------------------*
+*&      Form  HELP_FILE
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM help_file CHANGING y_path.
+
+  DATA: lv_path   TYPE string,
+        lv_title  TYPE string,
+        lv_server,
+        lv_al11.
+
+  CLEAR: lv_path,
+         lv_title,
+         lv_server,
+         lv_al11.
+
+  lv_al11 = space.
+
+  lv_path = y_path.
+
+  CALL METHOD cl_rsan_ut_files=>f4
+    EXPORTING
+      i_applserv         = lv_server
+      i_title            = lv_title
+      i_gui_extension    = space
+      i_gui_ext_filter   = space
+      i_applserv_logical = space
+      i_applserv_al11    = lv_al11
+    CHANGING
+      c_file_name        = lv_path
+    EXCEPTIONS
+      failed             = 1
+      OTHERS             = 2.
+
+  IF sy-subrc EQ 0.
+    y_path = lv_path.
+  ELSE.
+    MESSAGE s646(db) WITH text-e01 DISPLAY LIKE 'E'.
+    STOP.
+  ENDIF.
+
+ENDFORM.                    "help_file
+*&---------------------------------------------------------------------*
+*&      Form  GET_EXCEL_FILE
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM GET_EXCEL_FILE using x_filename.
+
+  data: lv_filename TYPE RLGRAP-FILENAME,
+        lv_sytabix  TYPE sy-tabix,
+        lv_end_row  TYPE i,
+        lv_end_col  TYPE i.
+
+  DATA: lt_intern       TYPE TABLE OF ALSMEX_TABLINE,
+        lt_intern_index TYPE TABLE OF ALSMEX_TABLINE.
+
+  FIELD-SYMBOLS: <intern> LIKE LINE OF lt_intern,
+                 <index>  LIKE LINE OF lt_intern,
+                 <file>   LIKE LINE OF gt_file_string.
+
+  lv_filename = x_filename.
+
+  IF lv_filename CS '.xlsx'.
+
+    lv_end_row = 1048576.
+    lv_end_col = 16384 .
+
+  ELSEIF lv_filename CS '.xls'.
+
+    lv_end_row = 65536.
+    lv_end_col = 256.
+
+  ELSE.
+    MESSAGE s646(db) WITH text-e02 DISPLAY LIKE 'E'.
+    STOP.
+  ENDIF.
+
+  "-------------------------------------------------
+  REFRESH lt_intern[].
+  CALL FUNCTION 'ALSM_EXCEL_TO_INTERNAL_TABLE'
+    EXPORTING
+      FILENAME                = lv_filename
+      I_BEGIN_COL             = 1
+      I_BEGIN_ROW             = 1
+      I_END_COL               = lv_end_col
+      I_END_ROW               = lv_end_row
+    TABLES
+      INTERN                  = lt_intern[]
+    EXCEPTIONS
+      INCONSISTENT_PARAMETERS = 1
+      UPLOAD_OLE              = 2
+      OTHERS                  = 3.
+  IF SY-SUBRC <> 0.
+    MESSAGE s646(db) WITH text-e03 DISPLAY LIKE 'E'.
+    STOP.
+  ENDIF.
+
+  IF cb_head EQ 'X'.
+    DELETE lt_intern WHERE row = 1.
+  ENDIF.
+
+  IF lt_intern IS INITIAL.
+    MESSAGE s646(db) WITH text-e04 DISPLAY LIKE 'W'.
+    STOP.
+  ENDIF.
+
+  SORT lt_intern BY row col.
+  lt_intern_index[] = lt_intern[].
+  DELETE ADJACENT DUPLICATES FROM lt_intern_index COMPARING row.
+
+  REFRESH gt_file_string.
+  LOOP AT lt_intern_index ASSIGNING <index>.
+
+    READ TABLE lt_intern TRANSPORTING NO FIELDS BINARY SEARCH
+      WITH KEY row = <index>-row.
+    CHECK sy-subrc EQ 0.
+    lv_sytabix = sy-tabix.
+
+    APPEND INITIAL LINE TO gt_file_string ASSIGNING <file>.
+    LOOP AT lt_intern ASSIGNING <intern> FROM lv_sytabix.
+      IF <intern>-row NE <index>-row.
+        EXIT.
+      ENDIF.
+
+      IF <file> IS INITIAL.
+        <file> = <intern>-VALUE.
+      ELSE.
+        <file> = <file> && ';' && <intern>-VALUE.
+      ENDIF.
+
+    ENDLOOP.
+
+  ENDLOOP.
+
+ENDFORM.                    " GET_EXCEL_FILE
+*&---------------------------------------------------------------------*
+*&      Form  cretate_output
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM create_output .
+
+  FIELD-SYMBOLS: <file>   LIKE LINE OF gt_file,
+                 <output> LIKE LINE OF gt_output.
+
+  REFRESH gt_output.
+  LOOP AT gt_file ASSIGNING <file>.
+
+    APPEND INITIAL LINE TO gt_output ASSIGNING <output>.
+
+    IF <file>-TAXNUM IS NOT INITIAL
+      AND <file>-DATE_FROM IS NOT INITIAL
+      AND <file>-DATE_TO   IS NOT INITIAL.
+      <output>-icon = c_positive.
+    ELSE.
+      <output>-icon = c_negative.
+    ENDIF.
+
+    <output>-TAXNUM       = <file>-TAXNUM.
+    <output>-DATE_FROM    = <file>-DATE_FROM.
+    <output>-DATE_TO      = <file>-DATE_TO.
+    <output>-EXT_UI       = <file>-EXT_UI.
+    <output>-CLASSE_ENERG = <file>-CLASSE_ENERG.
+    <output>-NON_ENERG    = <file>-NON_ENERG.
+    <output>-USER_NAME    = sy-uname.
+    <output>-DATE_MOD     = sy-datum.
+
+  ENDLOOP.
+
+ENDFORM.                    " cretate_output
+*&---------------------------------------------------------------------*
+*&      Form  UPDATE_DATA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM UPDATE_DATA .
+
+  FIELD-SYMBOLS: <output> LIKE LINE OF gt_output,
+                 <db>     LIKE LINE OF gt_output_db.
+
+  CHECK cb_simul EQ space.
+    REFRESH gt_output_db.
+    LOOP AT gt_output ASSIGNING <output>.
+
+      IF <output>-icon EQ c_positive.
+        APPEND INITIAL LINE TO gt_output_db ASSIGNING <db>.
+        MOVE-CORRESPONDING <output> TO <db>.
+
+      ENDIF.
+
+    ENDLOOP.
+
+    CHECK gt_output_db IS NOT INITIAL.
+    MODIFY ZTMDISU_GASSIVOR FROM TABLE gt_output_db.
+    COMMIT WORK.
+
+ENDFORM.                    " UPDATE_DATA
+*&---------------------------------------------------------------------*
+*&      Form  CONVERT_DATA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM CONVERT_DATA .
+
+  DATA: lv_stringa  TYPE string,
+        lv_stringa2 TYPE string,
+        lv_dato     TYPE string.
+
+  DATA: lv_field_list    TYPE abap_compdescr_tab,
+        lo_ref_table_des TYPE REF TO cl_abap_structdescr.
+
+  FIELD-SYMBOLS: <string> LIKE LINE OF gt_file_string,
+                 <s_file> LIKE LINE OF gt_file,
+                 <field>  LIKE LINE OF lv_field_list,
+                 <file>   TYPE ANY.
+
+  lo_ref_table_des ?=
+      cl_abap_typedescr=>describe_by_name( C_STRUCT_NAME ).
+  lv_field_list[] = lo_ref_table_des->components[].
+  CHECK lv_field_list IS NOT INITIAL.
+
+
+  REFRESH gt_file.
+  LOOP AT gt_file_string ASSIGNING <string>.
+
+    APPEND INITIAL LINE TO gt_file ASSIGNING <s_file>.
+
+    CLEAR lv_stringa.
+    CLEAR lv_stringa2.
+    LOOP AT lv_field_list ASSIGNING <field>.
+
+      ASSIGN COMPONENT <field>-name OF STRUCTURE <s_file> TO <file>.
+      CHECK sy-subrc EQ 0.
+
+      CLEAR lv_dato.
+
+      IF lv_stringa IS INITIAL.
+        lv_stringa = <string>.
+      ELSE.
+        lv_stringa = lv_stringa2.
+      ENDIF.
+
+      SPLIT lv_stringa AT ';' INTO lv_dato lv_stringa2.
+
+      CASE <field>-TYPE_KIND.
+        WHEN cl_abap_typedescr=>typekind_float.
+
+        WHEN cl_abap_typedescr=>typekind_date.
+
+          IF <field>-name EQ 'DATE_FROM'
+            OR <field>-name EQ 'DATE_TO'.
+            IF strlen( lv_dato ) EQ 10.
+              <file> = lv_dato(4) && lv_dato+5(2) && lv_dato+8(2).
+            ELSE.
+              <file> = c_data_base.
+            ENDIF.
+          ENDIF.
+
+        WHEN OTHERS.
+          <file> = lv_dato.
+      ENDCASE.
+
+    ENDLOOP.
+
+  ENDLOOP.
+
+ENDFORM.                    " CONVERT_DATA

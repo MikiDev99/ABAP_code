@@ -1,0 +1,94 @@
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_file_i.
+  PERFORM f_matchcode_file CHANGING p_file_i.
+
+
+*&---------------------------------------------------------------------*
+*&      Form  F_MATCHCODE_FILE
+*&---------------------------------------------------------------------*
+FORM f_matchcode_file  CHANGING cv_file.
+   DATA: lt_filetable TYPE filetable,
+        lcl_ref_itab TYPE REF TO file_table,
+        lv_rc        TYPE i.
+
+  IF r_server is INITIAL.
+  CALL METHOD cl_gui_frontend_services=>file_open_dialog
+    EXPORTING
+      window_title     = 'Selezione del file da elaborare'
+      default_filename = '*.csv' "DUMMY per le cartelle
+      multiselection   = ''
+    CHANGING
+      file_table       = lt_filetable
+      rc               = lv_rc.
+  READ TABLE lt_filetable REFERENCE INTO lcl_ref_itab INDEX 1.
+  IF lcl_ref_itab IS NOT INITIAL.
+    cv_file = lcl_ref_itab->filename.
+  ENDIF.
+  ELSE.
+    CALL FUNCTION '/SAPDMC/LSM_F4_SERVER_FILE'
+      EXPORTING
+        filemask         = '*.csv' "DUMMY per le cartelle
+      IMPORTING
+        serverfile       = cv_file
+      EXCEPTIONS
+        canceled_by_user = 1
+        OTHERS           = 2.
+  ENDIF.
+
+
+ENDFORM.
+
+--------------------------------------------------------------------------------------------------------------------------
+MATCHCODE A PARTIRE DA UNA CARTELLA SPECIFICA
+
+DATA: lt_filetable TYPE filetable,
+        lcl_ref_itab TYPE REF TO file_table,
+        lv_init_dir  TYPE string,
+        lv_rc        TYPE i.
+
+  IF r_server IS INITIAL.
+    lv_init_dir = p_folder. "---> CARTELLA DI PARTENZA
+
+    CALL METHOD cl_gui_frontend_services=>file_open_dialog
+      EXPORTING
+        window_title      = 'Selezione del file da elaborare'
+        default_filename  = '*.csv'
+        initial_directory = lv_init_dir
+        multiselection    = ''
+      CHANGING
+        file_table        = lt_filetable
+        rc                = lv_rc.
+    READ TABLE lt_filetable REFERENCE INTO lcl_ref_itab INDEX 1.
+    IF lcl_ref_itab IS NOT INITIAL.
+      cv_file = lcl_ref_itab->filename.
+    ENDIF.
+  ENDIF.
+
+----------------------------------------------------------------------------
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_pc.
+ 
+DATA: it_tab TYPE filetable,
+          wf_subrc TYPE i.
+DATA: wf_pcfile LIKE rlgrap-filename.
+ 
+  DATA: wf_filter TYPE string,
+        wf_dir TYPE string,
+        wf_title TYPE string,
+        wf_ext TYPE string.
+ 
+*  if p_ml = 'X'.                  "Manula Load - PC File
+  wf_title = text-012.          "Window title
+  wf_ext  = '.TXT'.           "Extension of the file
+  wf_filter = 'Text Files (*.TXT)|*.TXT'.         "File Type
+  wf_dir = wf_pcfile.           "Directory
+ 
+*Adds a GUI-Supported Feature
+  CALL METHOD cl_gui_frontend_services=>file_open_dialog
+    EXPORTING
+      window_title      = wf_title
+      default_extension = wf_ext
+      file_filter       = wf_filter
+      initial_directory = wf_dir
+    CHANGING
+      file_table        = it_tab
+      rc                = wf_subrc.

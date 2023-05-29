@@ -1,0 +1,63 @@
+*&---------------------------------------------------------------------*
+*& Include          ZMS_CSV_FORNITORI_TOP
+*&---------------------------------------------------------------------*
+
+
+TYPES: BEGIN OF ty_lfa1,
+         lifnr TYPE lfa1-lifnr,
+         land1 TYPE lfa1-land1,
+         name1 TYPE lfa1-name1,
+         name2 TYPE lfa1-name2,
+         name3 TYPE lfa1-name3,
+         name4 TYPE lfa1-name4,
+         ort01 TYPE lfa1-ort01,
+         ort02 TYPE lfa1-ort02,
+         pstlz TYPE lfa1-pstlz,
+         regio TYPE lfa1-regio,
+         stkzn TYPE lfa1-stkzn,
+         adrnr TYPE lfa1-adrnr,
+         tot   TYPE ekpo-netwr,
+         data  TYPE sy-datum,
+       END OF ty_lfa1,
+
+       BEGIN OF ty_adr,
+         smtp_addr  TYPE adr6-smtp_addr,
+         addrnumber TYPE adr6-addrnumber,
+       END OF ty_adr,
+
+       BEGIN OF ty_tiban,
+         lifnr      TYPE lfbk-lifnr,
+         banks      TYPE lfbk-banks,
+         bankl      TYPE lfbk-bankl,
+         bankn      TYPE lfbk-bankn,
+         iban       TYPE tiban-iban,
+         valid_from TYPE tiban-valid_from,
+       END OF ty_tiban,
+
+       BEGIN OF ty_ekko,
+         ebeln TYPE ekko-ebeln,
+         bedat TYPE ekko-bedat,
+         lifnr TYPE ekko-lifnr,
+         ebelp type ekpo-ebelp,
+         netwr type ekpo-netwr,
+       END OF ty_ekko,
+
+       BEGIN OF ty_ekpo,
+         ebeln TYPE ekpo-ebeln,
+         ebelp TYPE ekpo-ebelp,
+         netwr TYPE ekpo-netwr,
+       END OF ty_ekpo.
+
+CONSTANTS: c_title_lcl     TYPE string VALUE 'Seleziona cartella locale',
+           c_title_srv     TYPE string VALUE 'Seleziona una cartella su server',
+           c_base_lcl_dir  TYPE string VALUE 'C:\',
+           c_tab_name      TYPE string VALUE 'zms_forntiori',
+           c_default_fname TYPE string VALUE '\file.csv'.
+
+DATA: gt_output TYPE TABLE OF zms_forntiori.
+
+TYPES: tt_zms_fornitori TYPE TABLE OF zms_forntiori,
+       tt_lfa1          TYPE TABLE OF ty_lfa1,
+       tt_adr           TYPE TABLE OF ty_adr,
+       tt_tiban         TYPE TABLE OF ty_tiban,
+       tt_string        TYPE TABLE OF string.

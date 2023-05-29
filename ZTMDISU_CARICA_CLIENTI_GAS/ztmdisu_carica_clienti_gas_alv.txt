@@ -1,0 +1,110 @@
+*&---------------------------------------------------------------------*
+*&  Include           ZTMDISU_CARICA_CLIENTI_GAS_ALV
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_0100  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE STATUS_0100 OUTPUT.
+  SET PF-STATUS 'STATO_GUI'.
+  SET TITLEBAR 'TITLE001'.
+
+  PERFORM create_fieldcat.
+  PERFORM create_alv.
+ENDMODULE.                 " STATUS_0100  OUTPUT
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0100  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE USER_COMMAND_0100 INPUT.
+
+  CASE sy-ucomm.
+    WHEN c_back_ucomm.
+      LEAVE TO SCREEN 0.
+    WHEN c_backk_ucomm.
+      LEAVE TO SCREEN 0.
+    WHEN c_exit_ucomm.
+      LEAVE PROGRAM.
+    WHEN c_save_ucomm.
+*      CALL METHOD grid->refresh_table_display.
+*      PERFORM save_data.
+    WHEN OTHERS.
+  ENDCASE.
+
+ENDMODULE.                 " USER_COMMAND_0100  INPUT
+*&---------------------------------------------------------------------*
+*&      Form  CREATE_FIELDCAT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM CREATE_FIELDCAT .
+
+  DATA: lv_tab_name  TYPE dd02l-tabname.
+
+  FIELD-SYMBOLS: <fieldcat> LIKE LINE OF gt_fieldcat.
+
+  lv_tab_name = c_tab_name.
+
+  CALL FUNCTION 'LVC_FIELDCATALOG_MERGE'
+    EXPORTING
+*     I_BUFFER_ACTIVE        =
+      i_structure_name       = lv_tab_name
+*     I_CLIENT_NEVER_DISPLAY = 'X'
+*     I_BYPASSING_BUFFER     =
+*     i_internal_tabname     = lv_tab_name
+    CHANGING
+      ct_fieldcat            = gt_fieldcat
+    EXCEPTIONS
+      inconsistent_interface = 1
+      program_error          = 2
+      OTHERS                 = 3.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+  APPEND INITIAL LINE TO gt_fieldcat ASSIGNING <fieldcat>.
+  <fieldcat>-fieldname = 'ICON'.
+  <fieldcat>-coltext   = TEXT-t02.
+
+ENDFORM.                    " CREATE_FIELDCAT
+*&---------------------------------------------------------------------*
+*& Form CREATE_ALV
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM create_alv .
+
+  DATA: lvc_s_layo TYPE lvc_s_layo.
+
+  IF gv_container IS INITIAL.
+
+    CREATE OBJECT gv_container
+      EXPORTING
+        container_name = 'CC_CONT'.
+
+    CREATE OBJECT gv_grid
+      EXPORTING
+        i_parent = gv_container.
+
+*    lvc_s_layo-sel_mode = 'A'.
+    lvc_s_layo-zebra = 'X'.
+    CALL METHOD gv_grid->set_table_for_first_display
+      EXPORTING
+        is_layout       = lvc_s_layo
+      CHANGING
+        it_fieldcatalog = gt_fieldcat
+        it_outtab       = gt_output[].
+
+  ELSE.
+    CALL METHOD gv_grid->refresh_table_display.
+  ENDIF.
+
+ENDFORM.    " CREATE_ALV

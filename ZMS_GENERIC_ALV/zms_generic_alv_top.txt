@@ -1,0 +1,48 @@
+*&---------------------------------------------------------------------*
+*& Include          ZMS_GENERIC_ALV_TOP
+*&---------------------------------------------------------------------*
+
+TYPES: BEGIN OF ty_output.
+         INCLUDE TYPE lfa1.
+         TYPES:  icon TYPE icon_d.
+TYPES: END OF ty_output.
+
+TYPES: BEGIN OF ty_lfa1.
+         INCLUDE TYPE lfa1.
+         TYPES:  tot  TYPE ekpo-netwr,
+         icon TYPE icon_d.
+TYPES: END OF ty_lfa1,
+
+BEGIN OF ty_lfa1_lifnr,
+  lifnr TYPE lfa1-lifnr,
+END OF ty_lfa1_lifnr,
+
+BEGIN OF ty_ekko,
+  ebeln     TYPE ekko-ebeln,
+  lifnr     TYPE ekko-lifnr,
+  ebelp     TYPE ekpo-ebelp,
+  netwr     TYPE ekpo-netwr,
+  cellcolor TYPE lvc_t_scol, "per colorare celle
+END OF ty_ekko.
+
+CONSTANTS: c_back_ucomm   TYPE string VALUE 'BACK',
+           c_exit_ucomm   TYPE string VALUE 'EXIT',
+           c_save_ucomm   TYPE string VALUE 'SAVE',
+           c_tab_name     TYPE string VALUE 'LFA1',
+           c_positive_tot TYPE string VALUE '@5B@',
+           c_negative_tot TYPE string VALUE '@5C@',
+           c_nuetral_tot  TYPE string VALUE '@5D@'.
+
+DATA: gt_output        TYPE TABLE OF ty_output,
+      gt_ekko          TYPE TABLE OF ty_ekko,
+      gt_fatt          TYPE TABLE OF ty_ekko,
+      gt_fieldcat      TYPE lvc_t_fcat,
+      gt_fieldcat_fatt TYPE lvc_t_fcat.
+
+DATA: gv_container      TYPE REF TO cl_gui_custom_container,
+      gv_container_fatt TYPE REF TO cl_gui_custom_container,
+      gv_grid           TYPE REF TO cl_gui_alv_grid,
+      gv_grid_fatt      TYPE REF TO cl_gui_alv_grid.
+
+TYPES: tt_lfa1  TYPE TABLE OF ty_lfa1,
+       tt_dfies TYPE TABLE OF dfies.

@@ -1,0 +1,27 @@
+*&---------------------------------------------------------------------*
+*&  Include           ZTMDISU_CARICA_CLIENTI_GAS_TOP
+*&---------------------------------------------------------------------*
+TYPES: BEGIN OF ty_output.
+         INCLUDE TYPE ZTMDISU_GASSIVOR.
+         TYPES:  icon TYPE icon_d.
+TYPES: END OF ty_output.
+
+CONSTANTS: c_tab_name    TYPE string VALUE 'ZTMDISU_GASSIVOR',
+           c_struct_name TYPE string VALUE 'ZTMDISU_GASSIVR_TMP',
+           c_back_ucomm  TYPE string VALUE 'BACK',
+           c_backk_ucomm TYPE string VALUE 'BACKK',
+           c_exit_ucomm  TYPE string VALUE 'EXIT',
+           c_save_ucomm  TYPE string VALUE 'SAVE',
+           c_positive    TYPE string VALUE '@5CB@',
+           c_negative    TYPE string VALUE '@5C@',
+           c_data_base   TYPE d      VALUE 00000000.
+
+
+DATA: gt_file_string TYPE TABLE OF string,
+      gt_file        TYPE TABLE OF ztmdisu_gassivr_tmp,
+      gt_output      TYPE TABLE OF ty_output,
+      gt_output_db   TYPE TABLE OF ztmdisu_gassivor,
+      gt_fieldcat    TYPE lvc_t_fcat.
+
+DATA: gv_container      TYPE REF TO cl_gui_custom_container,
+      gv_grid           TYPE REF TO cl_gui_alv_grid.

@@ -1,0 +1,98 @@
+*&---------------------------------------------------------------------*
+*& Report ZMS_GET_HEADER_FROM_DDIC
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zms_get_header_from_ddic.
+
+PARAMETERS: p_table TYPE tabname OBLIGATORY. "Nome tabella
+
+DATA : gv_details       TYPE abap_compdescr_tab, "Conterrà i nomi dei campi
+       gv_intestazione  TYPE string,             "Conterrà le label relative ai campi
+       gv_daticsv       TYPE string,
+       gv_ref_table_des TYPE REF TO cl_abap_structdescr.
+
+DATA: gt_type   TYPE TABLE OF dfies, "Conterrà la struttura dei miei campi
+      gt_output TYPE REF TO data. "tabella di output
+
+FIELD-SYMBOLS: <t_output> TYPE STANDARD TABLE,
+               <s_output> TYPE any.
+
+
+IF p_table IS NOT INITIAL.
+
+  CREATE DATA gt_output TYPE TABLE OF (p_table).
+  ASSIGN gt_output->* TO <t_output>.  "<t_output> è la vera tabella
+
+  "Prendo i nomi dei campi della tabella
+  "-------------------------------------------------
+  gv_ref_table_des ?=
+      cl_abap_typedescr=>describe_by_name( p_table ).
+  gv_details[] = gv_ref_table_des->components[].
+
+
+  IF gv_details IS NOT INITIAL.
+
+    "Prendo le etichette dei campi della tabella
+    "-------------------------------------------------
+    CALL FUNCTION 'DDIF_FIELDINFO_GET'
+      EXPORTING
+        tabname        = p_table
+        langu          = sy-langu
+      TABLES
+        dfies_tab      = gt_type
+      EXCEPTIONS
+        not_found      = 1
+        internal_error = 2
+        OTHERS         = 3.
+    IF sy-subrc <> 0.
+      "Implement suitable error handling here
+    ENDIF.
+
+    "Costruisco l'intestazione
+    "-------------------------------------------------
+    LOOP AT gt_type ASSIGNING FIELD-SYMBOL(<fieldname>).
+
+      IF gv_intestazione IS INITIAL.
+        gv_intestazione = <fieldname>-fieldtext.
+      ELSE.
+        gv_intestazione = gv_intestazione &&  ';' && <fieldname>-fieldtext.
+      ENDIF.
+
+    ENDLOOP.
+
+
+    "Estrazione dati dalla tabella
+    "-------------------------------------------------
+    SELECT *
+      UP TO 5 ROWS
+      FROM (p_table)
+      INTO TABLE <t_output>.
+
+    CHECK sy-subrc EQ 0.
+
+    LOOP AT <t_output> ASSIGNING <s_output>.
+
+      CLEAR gv_daticsv.
+
+      LOOP AT gv_details ASSIGNING FIELD-SYMBOL(<detail>).
+
+        ASSIGN COMPONENT <detail>-name OF STRUCTURE <s_output> TO FIELD-SYMBOL(<output>).
+
+        IF gv_daticsv IS INITIAL.
+          gv_daticsv = <output>.
+        ELSE.
+          gv_daticsv = gv_daticsv && ';' && <output>.
+        ENDIF.
+
+      ENDLOOP.
+
+      WRITE:/, gv_daticsv.
+
+    ENDLOOP.
+
+    WRITE:/, gv_intestazione.
+
+  ENDIF.
+
+ENDIF.

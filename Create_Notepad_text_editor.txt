@@ -1,0 +1,179 @@
+Text editor is displayed on screen using custom control. 
+So we need a container for the custom control. 
+And text editor control is implemented using class CL_GUI_TEXTEDIT.
+
+"Dichiarazione dati
+
+DATA: LINE_LENGTH      TYPE I VALUE 254,
+      EDITOR_CONTAINER TYPE REF TO CL_GUI_CUSTOM_CONTAINER,
+      TEXT_EDITOR      TYPE REF TO CL_GUI_TEXTEDIT,
+      TEXT             TYPE STRING.
+	  
+"Call screen (qualsiasi numero)
+
+START-OF-SELECTION.
+  CALL SCREEN '100'.
+  
+"Vai su screen '100' e fai doppio click su '100'
+"Crea un custom control sulla screen con nome TEXTEDIT
+"Decommenta moduli PBO e PAI nella screen
+
+PROCESS BEFORE OUTPUT.
+ MODULE STATUS_0100.
+*
+PROCESS AFTER INPUT.
+ MODULE USER_COMMAND_0100.
+ 
+"Define and implement both the modules in the main program itself.
+"In PBO create object container EDITOR_CONTAINER. 
+"Then create text editor object by exporting the container EDITOR_CONTAINER.
+
+CREATE OBJECT EDITOR_CONTAINER
+      EXPORTING
+        CONTAINER_NAME              = 'TEXTEDITOR'
+      EXCEPTIONS
+        CNTL_ERROR                  = 1
+        CNTL_SYSTEM_ERROR           = 2
+        CREATE_ERROR                = 3
+        LIFETIME_ERROR              = 4
+        LIFETIME_DYNPRO_DYNPRO_LINK = 5.
+
+    CREATE OBJECT TEXT_EDITOR
+      EXPORTING
+        PARENT           = EDITOR_CONTAINER
+        WORDWRAP_MODE    = CL_GUI_TEXTEDIT=>WORDWRAP_AT_FIXED_POSITION
+        WORDWRAP_POSITION          = LINE_LENGTH
+        WORDWRAP_TO_LINEBREAK_MODE = CL_GUI_TEXTEDIT=>TRUE.
+		
+"You can hide the toolbar and as well as status bar for the text editor control.
+
+CALL METHOD TEXT_EDITOR->SET_TOOLBAR_MODE
+      EXPORTING
+        TOOLBAR_MODE = CL_GUI_TEXTEDIT=>FALSE.
+
+    CALL METHOD TEXT_EDITOR->SET_STATUSBAR_MODE
+      EXPORTING
+        STATUSBAR_MODE = CL_GUI_TEXTEDIT=>FALSE.
+		
+"Define and create a GUI Status in the PBO.
+
+SET PF-STATUS 'STATUS_0100'.
+
+"In PAI of the screen 100, handle the save and other user commands.
+
+CASE SY-UCOMM.
+    WHEN 'EXIT'.
+      LEAVE PROGRAM.
+    WHEN 'SAVE'.
+      CALL METHOD TEXT_EDITOR->GET_TEXTSTREAM
+*         EXPORTING
+*             ONLY_WHEN_MODIFIED     = CL_GUI_TEXTEDIT=>TRUE
+          IMPORTING
+              TEXT                   = TEXT
+*             IS_MODIFIED            =
+          EXCEPTIONS
+              ERROR_CNTL_CALL_METHOD = 1
+              NOT_SUPPORTED_BY_GUI   = 2
+              OTHERS                 = 3.
+
+      IF SY-SUBRC <> 0.
+        MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+                   WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+      ENDIF.
+
+      CALL METHOD CL_GUI_CFW=>FLUSH
+        EXCEPTIONS
+          CNTL_SYSTEM_ERROR = 1
+          CNTL_ERROR        = 2
+          OTHERS            = 3.
+      MESSAGE TEXT TYPE 'I'.
+  ENDCASE.
+"To read the text that is typed in the editor we need to call the method GET_TEXTSTREAM of the editor instance.
+"We are just displaying the text typed in the editor in an informative message; the same can be inserted / updated into a database table also.
+"The complete coding of the executable program is given below..
+
+REPORT  ZTEXT_EDITOR.
+
+DATA: LINE_LENGTH      TYPE I VALUE 254,
+      EDITOR_CONTAINER TYPE REF TO CL_GUI_CUSTOM_CONTAINER,
+      TEXT_EDITOR      TYPE REF TO CL_GUI_TEXTEDIT,
+      TEXT             TYPE STRING.
+
+START-OF-SELECTION.
+  CALL SCREEN '100'.
+
+**&---------------------------------------------------------------------*
+**&      Module  STATUS_0100  OUTPUT
+**&---------------------------------------------------------------------*
+**       text
+**----------------------------------------------------------------------*
+MODULE STATUS_0100 OUTPUT.
+
+  SET PF-STATUS 'STATUS_0100'.
+
+  IF TEXT_EDITOR IS INITIAL.
+
+    CREATE OBJECT EDITOR_CONTAINER
+      EXPORTING
+        CONTAINER_NAME              = 'TEXTEDITOR'
+      EXCEPTIONS
+        CNTL_ERROR                  = 1
+        CNTL_SYSTEM_ERROR           = 2
+        CREATE_ERROR                = 3
+        LIFETIME_ERROR              = 4
+        LIFETIME_DYNPRO_DYNPRO_LINK = 5.
+
+    CREATE OBJECT TEXT_EDITOR
+      EXPORTING
+        PARENT                     = EDITOR_CONTAINER
+        WORDWRAP_MODE              = CL_GUI_TEXTEDIT=>WORDWRAP_AT_FIXED_POSITION
+        WORDWRAP_POSITION          = LINE_LENGTH
+        WORDWRAP_TO_LINEBREAK_MODE = CL_GUI_TEXTEDIT=>TRUE.
+
+
+*3)HIDE TOOLBAR AND STATUSBAR
+
+    CALL METHOD TEXT_EDITOR->SET_TOOLBAR_MODE
+      EXPORTING
+        TOOLBAR_MODE = CL_GUI_TEXTEDIT=>FALSE.
+
+    CALL METHOD TEXT_EDITOR->SET_STATUSBAR_MODE
+      EXPORTING
+        STATUSBAR_MODE = CL_GUI_TEXTEDIT=>FALSE.
+
+  ENDIF.
+ENDMODULE.                 " STATUS_0100  OUTPUT
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0100  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE USER_COMMAND_0100 INPUT.
+  CASE SY-UCOMM.
+    WHEN 'EXIT'.
+      LEAVE PROGRAM.
+    WHEN 'SAVE'.
+      CALL METHOD TEXT_EDITOR->GET_TEXTSTREAM
+*         EXPORTING
+*             ONLY_WHEN_MODIFIED     = CL_GUI_TEXTEDIT=>TRUE
+          IMPORTING
+              TEXT                   = TEXT
+*             IS_MODIFIED            =
+          EXCEPTIONS
+              ERROR_CNTL_CALL_METHOD = 1
+              NOT_SUPPORTED_BY_GUI   = 2
+              OTHERS                 = 3.
+
+      IF SY-SUBRC <> 0.
+        MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+                   WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+      ENDIF.
+
+      CALL METHOD CL_GUI_CFW=>FLUSH
+        EXCEPTIONS
+          CNTL_SYSTEM_ERROR = 1
+          CNTL_ERROR        = 2
+          OTHERS            = 3.
+      MESSAGE TEXT TYPE 'I'.
+  ENDCASE.
+ENDMODULE.                 " USER_COMMAND_0100  INPUT

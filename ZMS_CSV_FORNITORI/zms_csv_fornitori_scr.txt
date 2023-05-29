@@ -1,0 +1,18 @@
+*&---------------------------------------------------------------------*
+*& Include          ZMS_CSV_FORNITORI_SCR
+*&---------------------------------------------------------------------*
+
+SELECTION-SCREEN: BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-000.
+
+PARAMETERS: rb_lcl RADIOBUTTON GROUP g1 DEFAULT 'X' USER-COMMAND clk,
+            rb_srv RADIOBUTTON GROUP g1.
+
+SELECTION-SCREEN SKIP.
+
+PARAMETERS p_dir   TYPE string LOWER CASE.
+"p_fname TYPE string.
+SELECTION-SCREEN SKIP.
+
+PARAMETERS cb_iban AS CHECKBOX DEFAULT 'X'.
+
+SELECTION-SCREEN: END OF BLOCK b1.

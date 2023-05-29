@@ -1,0 +1,413 @@
+*&---------------------------------------------------------------------*
+*& Include          ZMS_GENERIC_ALV_F01
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*& Form EXTRACT_DATA_FORNITORI
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM extract_data_fornitori .
+
+  DATA: lv_cursor    TYPE cursor.
+
+  DATA: lt_lfa1_pkg TYPE TABLE OF ty_lfa1.
+
+  REFRESH gt_output.
+  REFRESH gt_ekko.
+
+  CLEAR lv_cursor.
+  OPEN CURSOR lv_cursor FOR
+       SELECT *
+         FROM lfa1
+        WHERE lifnr IN s_forn.
+  DO.
+
+    REFRESH lt_lfa1_pkg.
+    FETCH NEXT CURSOR lv_cursor INTO TABLE lt_lfa1_pkg PACKAGE SIZE 5000.
+    IF sy-subrc <> 0.
+      EXIT.
+    ENDIF.
+
+    "Estrazione dati fatture dei fornitori
+    "-------------------------------------------------
+    PERFORM extract_fatt USING lt_lfa1_pkg.
+
+    "Valorizzo la tabella di output
+    "-------------------------------------------------
+    PERFORM create_output USING lt_lfa1_pkg.
+
+
+  ENDDO.
+
+  CLOSE CURSOR lv_cursor.
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form CREATE_OUTPUT
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> LT_LFA1_PKG
+*&---------------------------------------------------------------------*
+FORM create_output  USING yt_lfa1_pkg TYPE tt_lfa1.
+
+  LOOP AT yt_lfa1_pkg ASSIGNING FIELD-SYMBOL(<lfa1>).
+
+    APPEND INITIAL LINE TO gt_output ASSIGNING FIELD-SYMBOL(<output>).
+    MOVE-CORRESPONDING <lfa1> TO <output>.
+
+    IF <lfa1>-tot > 0.
+      <output>-icon = c_positive_tot.
+    ENDIF.
+
+    IF <lfa1>-tot < 0.
+      <output>-icon = c_negative_tot.
+    ENDIF.
+
+  ENDLOOP.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form CREATE_FIELDCAT
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM create_fieldcat .
+
+  DATA: lv_tab_name  TYPE dd02l-tabname.
+
+  FIELD-SYMBOLS: <fieldcat> LIKE LINE OF gt_fieldcat.
+
+*  DATA: lt_type          TYPE TABLE OF dfies.
+
+
+  lv_tab_name = c_tab_name.
+
+  CALL FUNCTION 'LVC_FIELDCATALOG_MERGE'
+    EXPORTING
+*     I_BUFFER_ACTIVE        =
+      i_structure_name       = lv_tab_name
+*     I_CLIENT_NEVER_DISPLAY = 'X'
+*     I_BYPASSING_BUFFER     =
+*     i_internal_tabname     = lv_tab_name
+    CHANGING
+      ct_fieldcat            = gt_fieldcat
+    EXCEPTIONS
+      inconsistent_interface = 1
+      program_error          = 2
+      OTHERS                 = 3.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+  APPEND INITIAL LINE TO gt_fieldcat ASSIGNING <fieldcat>.
+  <fieldcat>-fieldname = 'ICON'.
+  <fieldcat>-coltext   = TEXT-t01.
+*  <fieldcat>-icon      = abap_true.
+
+
+  LOOP AT gt_fieldcat ASSIGNING <fieldcat>.
+
+    <fieldcat>-col_opt = 'X'.
+
+    CASE <fieldcat>-fieldname.
+      WHEN 'LIFNR'.
+        <fieldcat>-hotspot = abap_true.
+*  	WHEN .
+      WHEN OTHERS.
+    ENDCASE.
+
+  ENDLOOP.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form CREATE_ALV
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM create_alv .
+
+  DATA: lvc_s_layo TYPE lvc_s_layo.
+
+  IF gv_container IS INITIAL.
+
+    CREATE OBJECT gv_container
+      EXPORTING
+        container_name = 'CC_CONT'.
+
+    CREATE OBJECT gv_grid
+      EXPORTING
+        i_parent = gv_container.
+
+*    CALL METHOD grid->register_edit_event
+*      EXPORTING
+*        i_event_id = cl_gui_alv_grid=>mc_evt_modified.
+
+    CREATE OBJECT handler.
+    SET HANDLER handler->toolbar              FOR gv_grid.
+    SET HANDLER handler->user_command         FOR gv_grid.
+    SET HANDLER handler->handle_hotspot_click FOR gv_grid.
+
+    lvc_s_layo-sel_mode = 'A'.
+    lvc_s_layo-zebra = 'X'.
+    CALL METHOD gv_grid->set_table_for_first_display
+      EXPORTING
+*       i_structure_name = 'EKKO'
+        is_layout       = lvc_s_layo
+      CHANGING
+        it_fieldcatalog = gt_fieldcat
+        it_outtab       = gt_output[].
+
+*    CALL METHOD gv_grid->set_ready_for_input
+*      EXPORTING
+*        i_ready_for_input = 1.
+
+*    CREATE OBJECT handler.
+
+
+  ELSE.
+    CALL METHOD gv_grid->refresh_table_display.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form EXTRACT_FATT
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM extract_fatt USING yt_lfa1_pkg TYPE tt_lfa1.
+
+  DATA: lt_ekko_pkg TYPE TABLE OF ty_ekko.
+
+  DATA: lv_cursor TYPE cursor.
+  "-------------------------------------------------
+
+
+  CLEAR lv_cursor.
+  OPEN CURSOR lv_cursor FOR
+     SELECT ekko~ebeln
+            ekko~lifnr
+            ekpo~ebelp
+            ekpo~netwr
+       FROM ekko
+       INNER JOIN ekpo AS ekpo ON ekpo~ebeln EQ ekko~ebeln
+       FOR ALL ENTRIES IN yt_lfa1_pkg
+       WHERE ekko~lifnr EQ yt_lfa1_pkg-lifnr.
+  DO.
+
+    REFRESH lt_ekko_pkg.
+    FETCH NEXT CURSOR lv_cursor INTO CORRESPONDING FIELDS OF TABLE lt_ekko_pkg PACKAGE SIZE 5000.
+    IF sy-subrc <> 0.
+      EXIT.
+    ENDIF.
+
+    SORT lt_ekko_pkg BY lifnr ebeln ebelp.
+    LOOP AT yt_lfa1_pkg ASSIGNING FIELD-SYMBOL(<lfa1>).
+
+      <lfa1>-icon = c_nuetral_tot.
+      READ TABLE lt_ekko_pkg TRANSPORTING NO FIELDS BINARY SEARCH
+        WITH KEY lifnr = <lfa1>-lifnr.
+      CHECK sy-subrc EQ 0.
+
+      LOOP AT lt_ekko_pkg ASSIGNING FIELD-SYMBOL(<ekko>) FROM sy-tabix.
+
+        IF <lfa1>-lifnr NE <ekko>-lifnr.
+          EXIT.
+        ENDIF.
+
+        ADD <ekko>-netwr TO <lfa1>-tot.
+
+      ENDLOOP.
+
+    ENDLOOP.
+
+    APPEND LINES OF lt_ekko_pkg TO gt_ekko.
+  ENDDO.
+  CLOSE CURSOR lv_cursor.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form VIEW_FATT
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM view_fatt .
+
+  DATA: lt_et_index_rows TYPE lvc_t_row,
+        lt_lifnr         TYPE SORTED TABLE OF ty_lfa1_lifnr WITH UNIQUE KEY lifnr,
+        ls_lifnr         LIKE LINE OF lt_lifnr.
+
+  gv_grid->get_selected_rows(
+    IMPORTING
+      et_index_rows = lt_et_index_rows
+    ).
+
+  IF lines( lt_et_index_rows ) < 1.
+    MESSAGE i646(db) WITH TEXT-i00 DISPLAY LIKE 'W'.
+    EXIT.
+  ENDIF.
+
+  REFRESH gt_fatt.
+  LOOP AT lt_et_index_rows ASSIGNING FIELD-SYMBOL(<index>).
+
+*    CLEAR ls_lifnr.
+
+    READ TABLE gt_output ASSIGNING FIELD-SYMBOL(<output>)
+      INDEX <index>-index.
+    CHECK sy-subrc EQ 0.
+
+*    ls_lifnr = <output>-lifnr.
+*    INSERT ls_lifnr INTO TABLE lt_lifnr.
+
+    READ TABLE gt_ekko TRANSPORTING NO FIELDS BINARY SEARCH
+      WITH KEY lifnr = <output>-lifnr.
+    CHECK sy-subrc EQ 0.
+
+    LOOP AT gt_ekko ASSIGNING FIELD-SYMBOL(<ekko>) FROM sy-tabix.
+      IF <ekko>-lifnr NE <output>-lifnr.
+        EXIT.
+      ENDIF.
+
+      APPEND INITIAL LINE TO gt_fatt ASSIGNING FIELD-SYMBOL(<fatt>).
+      <fatt>-ebeln  = <ekko>-ebeln.
+      <fatt>-lifnr  = <ekko>-lifnr.
+      <fatt>-ebelp  = <ekko>-ebelp.
+      <fatt>-netwr  = <ekko>-netwr.
+
+    ENDLOOP.
+
+  ENDLOOP.
+
+
+  CALL SCREEN 0200.
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form CREATE_FIELDCAT_FATT
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM create_fieldcat_fatt .
+
+  DATA: lv_cellcolor TYPE lvc_s_scol.
+
+  FIELD-SYMBOLS: <fatt> LIKE LINE OF gt_fatt.
+
+  FIELD-SYMBOLS: <fieldcat> LIKE LINE OF gt_fieldcat_fatt.
+
+  APPEND INITIAL LINE TO gt_fieldcat_fatt ASSIGNING <fieldcat>.
+  <fieldcat>-fieldname = 'EBELN'.
+  <fieldcat>-coltext   = TEXT-t02.
+
+  APPEND INITIAL LINE TO gt_fieldcat_fatt ASSIGNING <fieldcat>.
+  <fieldcat>-fieldname = 'LIFNR'.
+  <fieldcat>-coltext   = TEXT-t03.
+
+  APPEND INITIAL LINE TO gt_fieldcat_fatt ASSIGNING <fieldcat>.
+  <fieldcat>-fieldname = 'EBELP'.
+  <fieldcat>-coltext   = TEXT-t04.
+
+  APPEND INITIAL LINE TO gt_fieldcat_fatt ASSIGNING <fieldcat>.
+  <fieldcat>-fieldname = 'NETWR'.
+  <fieldcat>-coltext   = TEXT-t05.
+
+  LOOP AT gt_fatt ASSIGNING <fatt>.
+    CLEAR lv_cellcolor.
+    IF <fatt>-netwr > 100.
+      lv_cellcolor-fname = 'NETWR'.
+      lv_cellcolor-color-col = 5.
+      lv_cellcolor-color-int = 1.
+      lv_cellcolor-color-inv = 0.
+    ENDIF.
+
+    IF <fatt>-netwr < 100.
+      lv_cellcolor-fname = 'NETWR'.
+      lv_cellcolor-color-col = 6.
+      lv_cellcolor-color-int = 1.
+      lv_cellcolor-color-inv = 0.
+    ENDIF.
+
+    IF <fatt>-netwr = 100.
+*      lv_cellcolor-fname = 'NETWR'.
+      lv_cellcolor-color-col = 3.
+      lv_cellcolor-color-int = 1.
+      lv_cellcolor-color-inv = 0.
+    ENDIF.
+
+
+    APPEND lv_cellcolor TO <fatt>-cellcolor.
+  ENDLOOP.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form CREATE_ALV_FATT
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM create_alv_fatt .
+
+  DATA: lvc_s_layo TYPE lvc_s_layo.
+
+  IF gv_container_fatt IS INITIAL.
+
+    CREATE OBJECT gv_container_fatt
+      EXPORTING
+        container_name = 'CC_CONT2'.
+
+    CREATE OBJECT gv_grid_fatt
+      EXPORTING
+        i_parent = gv_container_fatt.
+
+*    CALL METHOD grid->register_edit_event
+*      EXPORTING
+*        i_event_id = cl_gui_alv_grid=>mc_evt_modified.
+
+*    CREATE OBJECT handler.
+*    SET HANDLER handler->toolbar FOR gv_grid.
+*    SET HANDLER handler->user_command FOR gv_grid.
+
+    lvc_s_layo-ctab_fname = 'CELLCOLOR'."For cell coloring
+
+    lvc_s_layo-zebra = 'X'.
+    CALL METHOD gv_grid_fatt->set_table_for_first_display
+      EXPORTING
+*       i_structure_name = 'EKKO'
+        is_layout       = lvc_s_layo
+      CHANGING
+        it_fieldcatalog = gt_fieldcat_fatt
+        it_outtab       = gt_fatt[].
+
+    CALL METHOD gv_grid_fatt->set_ready_for_input
+      EXPORTING
+        i_ready_for_input = 1.
+
+*    CREATE OBJECT handler.
+*    SET HANDLER handler->handle_hotspot_click FOR gv_grid.
+
+  ELSE.
+    CALL METHOD gv_grid_fatt->refresh_table_display.
+  ENDIF.
+ENDFORM.
